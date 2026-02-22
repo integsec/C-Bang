@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1200">
+    <title>C! OpenGraph Image</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 1200px;
+            height: 630px;
+            overflow: hidden;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #0a0a0f;
+            position: relative;
+        }
+
+        .canvas {
+            width: 1200px;
+            height: 630px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Background gradient orbs */
+        .bg-orb-1 {
+            position: absolute;
+            top: -120px;
+            left: -100px;
+            width: 500px;
+            height: 500px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+            filter: blur(60px);
+            pointer-events: none;
+        }
+
+        .bg-orb-2 {
+            position: absolute;
+            bottom: -150px;
+            right: -80px;
+            width: 550px;
+            height: 550px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.12) 0%, transparent 70%);
+            filter: blur(60px);
+            pointer-events: none;
+        }
+
+        .bg-orb-3 {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 400px;
+            height: 400px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(34, 211, 160, 0.06) 0%, transparent 70%);
+            filter: blur(80px);
+            pointer-events: none;
+        }
+
+        /* Subtle grid pattern */
+        .grid-overlay {
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+        }
+
+        /* Border frame */
+        .border-frame {
+            position: absolute;
+            inset: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 16px;
+            pointer-events: none;
+        }
+
+        /* Content */
+        .content {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 0;
+        }
+
+        /* Logo */
+        .logo {
+            font-size: 140px;
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: -4px;
+            margin-bottom: 20px;
+        }
+
+        .logo-c {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo-bang {
+            color: #22d3a0;
+            text-shadow: 0 0 40px rgba(34, 211, 160, 0.4);
+        }
+
+        /* Tagline */
+        .tagline {
+            font-size: 32px;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.95);
+            letter-spacing: -0.5px;
+            margin-bottom: 10px;
+        }
+
+        /* Subtitle */
+        .subtitle {
+            font-size: 22px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 40px;
+        }
+
+        /* Feature chips */
+        .chips {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 44px;
+        }
+
+        .chip {
+            padding: 10px 24px;
+            border-radius: 100px;
+            font-size: 16px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.85);
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .chip-linear {
+            border-color: rgba(99, 102, 241, 0.3);
+            color: #a5b4fc;
+        }
+
+        .chip-actor {
+            border-color: rgba(34, 211, 160, 0.3);
+            color: #6ee7b7;
+        }
+
+        .chip-deploy {
+            border-color: rgba(139, 92, 246, 0.3);
+            color: #c4b5fd;
+        }
+
+        /* URL */
+        .url {
+            font-size: 18px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.35);
+            letter-spacing: 1.5px;
+            text-transform: lowercase;
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="canvas">
+        <!-- Background effects -->
+        <div class="bg-orb-1"></div>
+        <div class="bg-orb-2"></div>
+        <div class="bg-orb-3"></div>
+        <div class="grid-overlay"></div>
+        <div class="border-frame"></div>
+
+        <!-- Content -->
+        <div class="content">
+            <div class="logo">
+                <span class="logo-c">C</span><span class="logo-bang">!</span>
+            </div>
+            <div class="tagline">The AI-Native Programming Language</div>
+            <div class="subtitle">Security by Construction</div>
+            <div class="chips">
+                <span class="chip chip-linear">Linear Types</span>
+                <span class="chip chip-actor">Actor Model</span>
+                <span class="chip chip-deploy">Universal Deployment</span>
+            </div>
+            <div class="url">c-bang.integsec.com</div>
+        </div>
+    </div>
+</body>
+</html>

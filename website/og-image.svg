@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <!-- Blue-purple gradient for C -->
+    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="50%" style="stop-color:#8b5cf6"/>
+      <stop offset="100%" style="stop-color:#a78bfa"/>
+    </linearGradient>
+
+    <!-- Background orb gradients -->
+    <radialGradient id="orb1" cx="15%" cy="15%" r="25%">
+      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:0.15"/>
+      <stop offset="100%" style="stop-color:#6366f1;stop-opacity:0"/>
+    </radialGradient>
+
+    <radialGradient id="orb2" cx="85%" cy="85%" r="28%">
+      <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:0.12"/>
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:0"/>
+    </radialGradient>
+
+    <radialGradient id="orb3" cx="50%" cy="50%" r="22%">
+      <stop offset="0%" style="stop-color:#22d3a0;stop-opacity:0.06"/>
+      <stop offset="100%" style="stop-color:#22d3a0;stop-opacity:0"/>
+    </radialGradient>
+
+    <!-- Glow filter for the ! -->
+    <filter id="bangGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Subtle grid pattern -->
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="rgba(255,255,255,0.025)" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#0a0a0f"/>
+
+  <!-- Background gradient orbs -->
+  <rect width="1200" height="630" fill="url(#orb1)"/>
+  <rect width="1200" height="630" fill="url(#orb2)"/>
+  <rect width="1200" height="630" fill="url(#orb3)"/>
+
+  <!-- Grid overlay -->
+  <rect width="1200" height="630" fill="url(#grid)"/>
+
+  <!-- Border frame -->
+  <rect x="16" y="16" width="1168" height="598" rx="16" ry="16" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+
+  <!-- Logo: C -->
+  <text x="548" y="290" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="800" font-size="140" letter-spacing="-4" text-anchor="end" fill="url(#logoGradient)">C</text>
+
+  <!-- Logo: ! with glow -->
+  <text x="558" y="290" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="800" font-size="140" text-anchor="start" fill="#22d3a0" filter="url(#bangGlow)">!</text>
+
+  <!-- Tagline -->
+  <text x="600" y="340" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="700" font-size="32" text-anchor="middle" fill="rgba(255,255,255,0.95)">The AI-Native Programming Language</text>
+
+  <!-- Subtitle -->
+  <text x="600" y="374" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="500" font-size="22" text-anchor="middle" fill="rgba(255,255,255,0.5)">Security by Construction</text>
+
+  <!-- Feature chips -->
+  <!-- Linear Types chip -->
+  <rect x="302" y="410" width="160" height="40" rx="20" fill="rgba(255,255,255,0.06)" stroke="rgba(99,102,241,0.3)" stroke-width="1"/>
+  <text x="382" y="436" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="600" font-size="16" text-anchor="middle" fill="#a5b4fc">Linear Types</text>
+
+  <!-- Actor Model chip -->
+  <rect x="482" y="410" width="156" height="40" rx="20" fill="rgba(255,255,255,0.06)" stroke="rgba(34,211,160,0.3)" stroke-width="1"/>
+  <text x="560" y="436" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="600" font-size="16" text-anchor="middle" fill="#6ee7b7">Actor Model</text>
+
+  <!-- Universal Deployment chip -->
+  <rect x="658" y="410" width="232" height="40" rx="20" fill="rgba(255,255,255,0.06)" stroke="rgba(139,92,246,0.3)" stroke-width="1"/>
+  <text x="774" y="436" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="600" font-size="16" text-anchor="middle" fill="#c4b5fd">Universal Deployment</text>
+
+  <!-- Website URL -->
+  <text x="600" y="502" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="500" font-size="18" text-anchor="middle" fill="rgba(255,255,255,0.35)" letter-spacing="1.5">c-bang.integsec.com</text>
+</svg>
