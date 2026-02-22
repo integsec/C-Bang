@@ -66,10 +66,10 @@
   <text x="525" y="453" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="700" font-size="30" text-anchor="middle" fill="#22d3a0">Pitch in some tokens. Let's build the future.</text>
 
   <!-- Stats -->
-  <text x="250" y="518" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="800" font-size="36" text-anchor="middle" fill="#a5b4fc">26+</text>
+  <text x="250" y="518" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="800" font-size="36" text-anchor="middle" fill="#a5b4fc">33+</text>
   <text x="250" y="545" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="22" text-anchor="middle" fill="rgba(255,255,255,0.35)">Issues to Grab</text>
 
-  <text x="525" y="518" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="800" font-size="36" text-anchor="middle" fill="#6ee7b7">75</text>
+  <text x="525" y="518" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="800" font-size="36" text-anchor="middle" fill="#6ee7b7">151</text>
   <text x="525" y="545" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="22" text-anchor="middle" fill="rgba(255,255,255,0.35)">Tests Passing</text>
 
   <text x="800" y="518" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="800" font-size="36" text-anchor="middle" fill="#c4b5fd">100%</text>

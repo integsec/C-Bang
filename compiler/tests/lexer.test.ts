@@ -224,6 +224,142 @@ describe('Lexer', () => {
     });
   });
 
+  describe('additional operators and tokens', () => {
+    it('lexes ampersand token', () => {
+      expect(tokenTypes('&')).toEqual([TokenType.Ampersand]);
+    });
+
+    it('lexes pipe token', () => {
+      expect(tokenTypes('|')).toEqual([TokenType.Pipe]);
+    });
+
+    it('lexes dot token', () => {
+      expect(tokenTypes('.')).toEqual([TokenType.Dot]);
+    });
+
+    it('lexes exclamation as not operator', () => {
+      expect(tokenTypes('!')).toEqual([TokenType.Not]);
+    });
+  });
+
+  describe('additional string edge cases', () => {
+    it('lexes empty string', () => {
+      expect(tokenTypes('""')).toEqual([TokenType.StringLiteral]);
+      expect(tokenValues('""')[0]).toBe('');
+    });
+
+    it('lexes string with backslash escape', () => {
+      expect(tokenValues('"path\\\\to\\\\file"')[0]).toBe('path\\to\\file');
+    });
+
+    it('lexes string with unrecognized escape as literal', () => {
+      // \0 is not a recognized escape, so lexer preserves it as \0
+      expect(tokenValues('"null\\0byte"')[0]).toBe('null\\0byte');
+    });
+  });
+
+  describe('additional number edge cases', () => {
+    it('lexes zero', () => {
+      expect(tokenValues('0')[0]).toBe('0');
+      expect(tokenTypes('0')).toEqual([TokenType.IntLiteral]);
+    });
+
+    it('lexes large integer', () => {
+      expect(tokenValues('999999999999')[0]).toBe('999999999999');
+    });
+
+    it('lexes hex with underscores', () => {
+      expect(tokenValues('0xFF_FF')[0]).toBe('0xFF_FF');
+    });
+
+    it('lexes float without integer part after dot', () => {
+      // 0.0 should be a float
+      expect(tokenTypes('0.0')).toEqual([TokenType.FloatLiteral]);
+    });
+  });
+
+  describe('deploy keyword', () => {
+    it('recognizes deploy as keyword', () => {
+      const tokens = lex('deploy');
+      expect(tokens[0]!.type).toBe('deploy');
+    });
+  });
+
+  describe('position tracking extended', () => {
+    it('tracks positions across multiple lines', () => {
+      const tokens = lex('fn\n  main\n    ()');
+      const fn_ = tokens[0]!;
+      const main = tokens[1]!;
+      const lparen = tokens[2]!;
+      expect(fn_.span.start.line).toBe(1);
+      expect(fn_.span.start.column).toBe(1);
+      expect(main.span.start.line).toBe(2);
+      expect(main.span.start.column).toBe(3);
+      expect(lparen.span.start.line).toBe(3);
+      expect(lparen.span.start.column).toBe(5);
+    });
+
+    it('tracks end positions', () => {
+      const tokens = lex('hello');
+      const tok = tokens[0]!;
+      expect(tok.span.start.column).toBe(1);
+      expect(tok.span.end.column).toBe(6);
+    });
+  });
+
+  describe('error tokens', () => {
+    it('produces error for unknown characters', () => {
+      const tokens = lex('`');
+      expect(tokens[0]!.type).toBe(TokenType.Error);
+    });
+
+    it('handles unterminated block comment as comment token', () => {
+      // Lexer treats unterminated block comments as Comment, not Error
+      const tokens = lex('/* unterminated');
+      const comments = tokens.filter(t => t.type === TokenType.Comment);
+      expect(comments.length).toBe(1);
+      expect(comments[0]!.value).toContain('unterminated');
+    });
+  });
+
+  describe('whitespace and formatting', () => {
+    it('handles tabs and spaces correctly', () => {
+      const tokens = lex('\t\tfoo\t\tbar');
+      const ids = tokens.filter(t => t.type === TokenType.Identifier);
+      expect(ids.map(t => t.value)).toEqual(['foo', 'bar']);
+    });
+
+    it('handles carriage returns', () => {
+      const tokens = lex('foo\r\nbar');
+      const ids = tokens.filter(t =>
+        t.type !== TokenType.Comment && t.type !== TokenType.EOF,
+      );
+      expect(ids.map(t => t.value)).toEqual(['foo', 'bar']);
+    });
+  });
+
+  describe('operator disambiguation', () => {
+    it('distinguishes -> from - >', () => {
+      expect(tokenTypes('->')).toEqual([TokenType.Arrow]);
+    });
+
+    it('distinguishes => from = >', () => {
+      expect(tokenTypes('=>')).toEqual([TokenType.FatArrow]);
+    });
+
+    it('distinguishes .. from . .', () => {
+      expect(tokenTypes('..')).toEqual([TokenType.DotDot]);
+    });
+
+    it('distinguishes ..= from .. =', () => {
+      expect(tokenTypes('..=')).toEqual([TokenType.DotDotEq]);
+    });
+
+    it('distinguishes :: from : :', () => {
+      expect(tokenTypes('::')).toEqual([TokenType.ColonColon]);
+    });
+  });
+
   describe('real C! code', () => {
     it('lexes a simple function', () => {
       const source = `fn main() {

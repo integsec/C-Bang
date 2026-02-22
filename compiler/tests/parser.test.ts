@@ -539,6 +539,762 @@ describe('Parser', () => {
     });
   });
 
+  describe('server declarations', () => {
+    it('parses server with state and function', () => {
+      const { program, diagnostics } = parse(`
+        server ApiServer {
+          state port: u16
+
+          fn handle_request(req: Request) -> Response {
+            return Ok;
+          }
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const server = program.items[0] as any;
+      expect(server.kind).toBe('ServerDecl');
+      expect(server.name).toBe('ApiServer');
+      expect(server.members).toHaveLength(2);
+      expect(server.members[0].kind).toBe('StateDecl');
+      expect(server.members[1].kind).toBe('FunctionDecl');
+    });
+
+    it('parses server with field assignment', () => {
+      const { program, diagnostics } = parse(`
+        server WebServer {
+          bind: "0.0.0.0:8080"
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const server = program.items[0] as any;
+      expect(server.members[0].kind).toBe('FieldAssignment');
+      expect(server.members[0].name).toBe('bind');
+    });
+  });
+
+  describe('component declarations', () => {
+    it('parses component with params and body', () => {
+      const { program, diagnostics } = parse(`
+        component Button(label: String, on_click: Handler) {
+          emit Click(label);
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const comp = program.items[0] as any;
+      expect(comp.kind).toBe('ComponentDecl');
+      expect(comp.name).toBe('Button');
+      expect(comp.params).toHaveLength(2);
+      expect(comp.params[0].name).toBe('label');
+      expect(comp.params[1].name).toBe('on_click');
+    });
+
+    it('parses pub component', () => {
+      const { program, diagnostics } = parse(`
+        pub component Header(title: String) {
+          let x = 1;
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const comp = program.items[0] as any;
+      expect(comp.visibility).toBe('public');
+    });
+  });
+
+  describe('module declarations', () => {
+    it('parses mod with body', () => {
+      const { program, diagnostics } = parse(`
+        mod utils {
+          fn helper() {
+            let x = 1;
+          }
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const mod_ = program.items[0] as any;
+      expect(mod_.kind).toBe('ModDecl');
+      expect(mod_.name).toBe('utils');
+      expect(mod_.body).toHaveLength(1);
+      expect(mod_.body[0].kind).toBe('FunctionDecl');
+    });
+
+    it('parses mod declaration without body', () => {
+      const { program, diagnostics } = parse(`
+        mod database;
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const mod_ = program.items[0] as any;
+      expect(mod_.kind).toBe('ModDecl');
+      expect(mod_.name).toBe('database');
+      expect(mod_.body).toBeNull();
+    });
+  });
+
+  describe('async functions', () => {
+    it('parses async function', () => {
+      const { program, diagnostics } = parse(`
+        async fn fetch_data(url: String) -> Result {
+          return Ok;
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const fn_ = program.items[0] as any;
+      expect(fn_.isAsync).toBe(true);
+      expect(fn_.isPure).toBe(false);
+    });
+
+    it('parses pure async function', () => {
+      const { program, diagnostics } = parse(`
+        pure async fn compute(x: i32) -> i32 {
+          return x;
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const fn_ = program.items[0] as any;
+      expect(fn_.isPure).toBe(true);
+      expect(fn_.isAsync).toBe(true);
+    });
+  });
+
+  describe('mutable let bindings', () => {
+    it('parses let mut binding', () => {
+      const { program } = parse(`fn f() { let mut count = 0; }`);
+      const fn_ = program.items[0] as any;
+      const stmt = fn_.body.statements[0];
+      expect(stmt.kind).toBe('LetStmt');
+      expect(stmt.mutable).toBe(true);
+      expect(stmt.name).toBe('count');
+    });
+
+    it('parses let mut with type annotation', () => {
+      const { program } = parse(`fn f() { let mut total: u256 = 0; }`);
+      const fn_ = program.items[0] as any;
+      const stmt = fn_.body.statements[0];
+      expect(stmt.mutable).toBe(true);
+      expect(stmt.typeAnnotation).not.toBeNull();
+      expect(stmt.typeAnnotation.name).toBe('u256');
+    });
+  });
+
+  describe('reply statements', () => {
+    it('parses reply with expression', () => {
+      const { program } = parse(`
+        fn f() {
+          reply Receipt { tx_id: id };
+        }
+      `);
+      const fn_ = program.items[0] as any;
+      const stmt = fn_.body.statements[0];
+      expect(stmt.kind).toBe('ReplyStmt');
+      expect(stmt.value.kind).toBe('Struct');
+      expect(stmt.value.name).toBe('Receipt');
+    });
+
+    it('parses reply with simple value', () => {
+      const { program } = parse(`fn f() { reply 42; }`);
+      const fn_ = program.items[0] as any;
+      const stmt = fn_.body.statements[0];
+      expect(stmt.kind).toBe('ReplyStmt');
+      expect(stmt.value.kind).toBe('IntLiteral');
+    });
+  });
+
+  describe('spawn statements', () => {
+    it('parses spawn with arguments', () => {
+      const { program, diagnostics } = parse(`
+        fn f() {
+          spawn Worker(config, 10);
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const fn_ = program.items[0] as any;
+      const stmt = fn_.body.statements[0];
+      expect(stmt.kind).toBe('SpawnStmt');
+      expect(stmt.actor).toBe('Worker');
+      expect(stmt.args).toHaveLength(2);
+    });
+
+    it('parses spawn without arguments', () => {
+      const { program, diagnostics } = parse(`
+        fn f() {
+          spawn Monitor;
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const fn_ = program.items[0] as any;
+      const stmt = fn_.body.statements[0];
+      expect(stmt.kind).toBe('SpawnStmt');
+      expect(stmt.actor).toBe('Monitor');
+      expect(stmt.args).toHaveLength(0);
+    });
+  });
+
+  describe('deploy expressions', () => {
+    it('parses deploy expression', () => {
+      const { program, diagnostics } = parse(`
+        fn f() {
+          deploy TokenContract(supply, name);
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const fn_ = program.items[0] as any;
+      const stmt = fn_.body.statements[0];
+      expect(stmt.kind).toBe('ExprStmt');
+      expect(stmt.expr.kind).toBe('Call');
+    });
+  });
+
+  describe('refined types', () => {
+    it('parses refined type with range constraint', () => {
+      const { program, diagnostics } = parse(`
+        type Port = u16{1..65535}
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const td = program.items[0] as any;
+      expect(td.body.kind).toBe('Alias');
+      expect(td.body.type.kind).toBe('RefinedType');
+      expect(td.body.type.baseType.name).toBe('u16');
+      expect(td.body.type.constraints).toHaveLength(1);
+    });
+
+    it('parses refined type with named constraint', () => {
+      const { program, diagnostics } = parse(`
+        type Email = String{pattern: "^[a-z]+@[a-z]+$"}
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const td = program.items[0] as any;
+      expect(td.body.type.kind).toBe('RefinedType');
+      expect(td.body.type.constraints[0].name).toBe('pattern');
+    });
+  });
+
+  describe('ownership type expressions', () => {
+    it('parses own type in type expression', () => {
+      const { program } = parse(`fn f(x: own Token) { let a = 1; }`);
+      const fn_ = program.items[0] as any;
+      expect(fn_.params[0].ownership).toBe('own');
+    });
+
+    it('parses shared type in type expression', () => {
+      const { program } = parse(`fn f(x: shared Config) { let a = 1; }`);
+      const fn_ = program.items[0] as any;
+      expect(fn_.params[0].ownership).toBe('shared');
+    });
+  });
+
+  describe('additional type expressions', () => {
+    it('parses unit type ()', () => {
+      const { program } = parse(`fn f() -> () { let a = 1; }`);
+      const fn_ = program.items[0] as any;
+      expect(fn_.returnType).not.toBeNull();
+      expect(fn_.returnType.name).toBe('()');
+    });
+
+    it('parses nested generic types', () => {
+      const { program } = parse(`fn f(x: Map<String, Vec<i32>>) { let a = 1; }`);
+      const fn_ = program.items[0] as any;
+      const type_ = fn_.params[0].typeAnnotation;
+      expect(type_.kind).toBe('GenericType');
+      expect(type_.name).toBe('Map');
+      expect(type_.typeArgs).toHaveLength(2);
+      expect(type_.typeArgs[1].kind).toBe('GenericType');
+      expect(type_.typeArgs[1].name).toBe('Vec');
+    });
+  });
+
+  describe('field access', () => {
+    it('parses field access expression', () => {
+      const { program } = parse(`fn f() { let x = obj.field; }`);
+      const fn_ = program.items[0] as any;
+      const init = fn_.body.statements[0].initializer;
+      expect(init.kind).toBe('FieldAccess');
+      expect(init.object.name).toBe('obj');
+      expect(init.field).toBe('field');
+    });
+
+    it('parses chained field access', () => {
+      const { program } = parse(`fn f() { let x = a.b.c; }`);
+      const fn_ = program.items[0] as any;
+      const init = fn_.body.statements[0].initializer;
+      expect(init.kind).toBe('FieldAccess');
+      expect(init.field).toBe('c');
+      expect(init.object.kind).toBe('FieldAccess');
+      expect(init.object.field).toBe('b');
+    });
+
+    it('parses chained method calls', () => {
+      const { program } = parse(`fn f() { list.filter(x).map(y).collect(); }`);
+      const fn_ = program.items[0] as any;
+      const expr = fn_.body.statements[0].expr;
+      expect(expr.kind).toBe('MethodCall');
+      expect(expr.method).toBe('collect');
+      expect(expr.object.kind).toBe('MethodCall');
+      expect(expr.object.method).toBe('map');
+    });
+  });
+
+  describe('range expressions', () => {
+    it('parses exclusive range', () => {
+      const { program } = parse(`fn f() { let r = 1..10; }`);
+      const fn_ = program.items[0] as any;
+      const init = fn_.body.statements[0].initializer;
+      expect(init.kind).toBe('Range');
+      expect(init.inclusive).toBe(false);
+      expect(init.start.kind).toBe('IntLiteral');
+      expect(init.end.kind).toBe('IntLiteral');
+    });
+
+    it('parses inclusive range', () => {
+      const { program } = parse(`fn f() { let r = 0..=255; }`);
+      const fn_ = program.items[0] as any;
+      const init = fn_.body.statements[0].initializer;
+      expect(init.kind).toBe('Range');
+      expect(init.inclusive).toBe(true);
+    });
+  });
+
+  describe('additional literal expressions', () => {
+    it('parses bool literals', () => {
+      const { program } = parse(`fn f() { let a = true; let b = false; }`);
+      const fn_ = program.items[0] as any;
+      expect(fn_.body.statements[0].initializer.kind).toBe('BoolLiteral');
+      expect(fn_.body.statements[0].initializer.value).toBe(true);
+      expect(fn_.body.statements[1].initializer.kind).toBe('BoolLiteral');
+      expect(fn_.body.statements[1].initializer.value).toBe(false);
+    });
+
+    it('parses float literals', () => {
+      const { program } = parse(`fn f() { let pi = 3.14159; }`);
+      const fn_ = program.items[0] as any;
+      expect(fn_.body.statements[0].initializer.kind).toBe('FloatLiteral');
+      expect(fn_.body.statements[0].initializer.value).toBe('3.14159');
+    });
+
+    it('parses string literals in expressions', () => {
+      const { program } = parse(`fn f() { let name = "hello world"; }`);
+      const fn_ = program.items[0] as any;
+      expect(fn_.body.statements[0].initializer.kind).toBe('StringLiteral');
+      expect(fn_.body.statements[0].initializer.value).toBe('hello world');
+    });
+  });
+
+  describe('parallel and scope expressions', () => {
+    it('parses parallel block', () => {
+      const { program } = parse(`
+        fn f() {
+          parallel {
+            let x = 1;
+          }
+        }
+      `);
+      const fn_ = program.items[0] as any;
+      const expr = fn_.body.statements[0].expr;
+      expect(expr.kind).toBe('Parallel');
+      expect(expr.body.statements).toHaveLength(1);
+    });
+
+    it('parses scope expression', () => {
+      const { program } = parse(`
+        fn f() {
+          scope conn = get_connection() {
+            let data = conn;
+          }
+        }
+      `);
+      const fn_ = program.items[0] as any;
+      const expr = fn_.body.statements[0].expr;
+      expect(expr.kind).toBe('Scope');
+      expect(expr.name).toBe('conn');
+    });
+  });
+
+  describe('if/else chains', () => {
+    it('parses if/else if/else chain', () => {
+      const { program } = parse(`
+        fn f() {
+          if x > 10 {
+            let a = 1;
+          } else if x > 5 {
+            let b = 2;
+          } else {
+            let c = 3;
+          }
+        }
+      `);
+      const fn_ = program.items[0] as any;
+      const stmt = fn_.body.statements[0];
+      expect(stmt.kind).toBe('IfStmt');
+      expect(stmt.else_).not.toBeNull();
+      expect(stmt.else_.kind).toBe('IfStmt');
+      expect(stmt.else_.else_).not.toBeNull();
+      expect(stmt.else_.else_.kind).toBe('Block');
+    });
+  });
+
+  describe('match patterns', () => {
+    it('parses wildcard pattern', () => {
+      const { program } = parse(`
+        fn f() {
+          match x {
+            _ => print("default"),
+          }
+        }
+      `);
+      const fn_ = program.items[0] as any;
+      const arm = fn_.body.statements[0].arms[0];
+      expect(arm.pattern.kind).toBe('WildcardPattern');
+    });
+
+    it('parses literal patterns', () => {
+      const { program } = parse(`
+        fn f() {
+          match status {
+            200 => print("ok"),
+            404 => print("not found"),
+            _ => print("other"),
+          }
+        }
+      `);
+      const fn_ = program.items[0] as any;
+      const arms = fn_.body.statements[0].arms;
+      expect(arms[0].pattern.kind).toBe('LiteralPattern');
+      expect(arms[0].pattern.value).toBe(200);
+      expect(arms[1].pattern.kind).toBe('LiteralPattern');
+      expect(arms[1].pattern.value).toBe(404);
+      expect(arms[2].pattern.kind).toBe('WildcardPattern');
+    });
+
+    it('parses match with block bodies', () => {
+      const { program } = parse(`
+        fn f() {
+          match result {
+            Ok(value) => {
+              let x = value;
+              print(x);
+            },
+            Err(msg) => {
+              print(msg);
+            },
+          }
+        }
+      `);
+      const fn_ = program.items[0] as any;
+      const arms = fn_.body.statements[0].arms;
+      expect(arms[0].body.kind).toBe('Block');
+      expect(arms[0].body.statements).toHaveLength(2);
+      expect(arms[1].body.kind).toBe('Block');
+    });
+
+    it('parses constructor pattern without args', () => {
+      const { program } = parse(`
+        fn f() {
+          match opt {
+            Some(x) => print(x),
+            None => print("empty"),
+          }
+        }
+      `);
+      const fn_ = program.items[0] as any;
+      const arms = fn_.body.statements[0].arms;
+      expect(arms[0].pattern.kind).toBe('ConstructorPattern');
+      expect(arms[0].pattern.name).toBe('Some');
+      expect(arms[1].pattern.kind).toBe('ConstructorPattern');
+      expect(arms[1].pattern.name).toBe('None');
+      expect(arms[1].pattern.fields).toHaveLength(0);
+    });
+
+    it('parses bool literal pattern', () => {
+      const { program } = parse(`
+        fn f() {
+          match flag {
+            true => print("yes"),
+            false => print("no"),
+          }
+        }
+      `);
+      const fn_ = program.items[0] as any;
+      const arms = fn_.body.statements[0].arms;
+      expect(arms[0].pattern.kind).toBe('LiteralPattern');
+      expect(arms[0].pattern.value).toBe(true);
+      expect(arms[1].pattern.kind).toBe('LiteralPattern');
+      expect(arms[1].pattern.value).toBe(false);
+    });
+  });
+
+  describe('actor extended features', () => {
+    it('parses actor with init', () => {
+      const { program, diagnostics } = parse(`
+        actor Cache {
+          state data: Map<String, String>
+
+          init(capacity: i32) {
+            let x = capacity;
+          }
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const actor = program.items[0] as any;
+      expect(actor.members).toHaveLength(2);
+      expect(actor.members[1].kind).toBe('InitDecl');
+      expect(actor.members[1].params).toHaveLength(1);
+    });
+
+    it('parses actor with function members', () => {
+      const { program, diagnostics } = parse(`
+        actor Logger {
+          state entries: Vec<String>
+
+          pub fn get_entries() -> Vec<String> {
+            return entries;
+          }
+
+          fn internal_log(msg: String) {
+            let x = msg;
+          }
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const actor = program.items[0] as any;
+      expect(actor.members).toHaveLength(3);
+      expect(actor.members[1].kind).toBe('FunctionDecl');
+      expect(actor.members[1].visibility).toBe('public');
+      expect(actor.members[2].kind).toBe('FunctionDecl');
+      expect(actor.members[2].visibility).toBe('private');
+    });
+
+    it('parses on handler with return type', () => {
+      const { program, diagnostics } = parse(`
+        actor Service {
+          on Query(id: u64) -> Result {
+            return Ok;
+          }
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const handler = (program.items[0] as any).members[0];
+      expect(handler.kind).toBe('OnHandler');
+      expect(handler.returnType).not.toBeNull();
+      expect(handler.returnType.name).toBe('Result');
+    });
+  });
+
+  describe('contract extended features', () => {
+    it('parses contract with multiple interfaces', () => {
+      const { program, diagnostics } = parse(`
+        contract MultiToken : ERC20, ERC721, Ownable {
+          state supply: u256
+
+          pub fn name() -> String {
+            return "Multi";
+          }
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const contract = program.items[0] as any;
+      expect(contract.interfaces).toEqual(['ERC20', 'ERC721', 'Ownable']);
+    });
+  });
+
+  describe('visibility', () => {
+    it('parses pub(pkg) visibility', () => {
+      const { program, diagnostics } = parse(`
+        pub(pkg) fn internal_helper() {
+          let x = 1;
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const fn_ = program.items[0] as any;
+      expect(fn_.visibility).toBe('package');
+    });
+  });
+
+  describe('use extended features', () => {
+    it('parses use with alias', () => {
+      const { program, diagnostics } = parse(`
+        use crypto::hash::{SHA256 as Hash, MD5};
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const use_ = program.items[0] as any;
+      expect(use_.items).toHaveLength(2);
+      expect(use_.items[0].name).toBe('SHA256');
+      expect(use_.items[0].alias).toBe('Hash');
+      expect(use_.items[1].name).toBe('MD5');
+      expect(use_.items[1].alias).toBeNull();
+    });
+  });
+
+  describe('state with initializer', () => {
+    it('parses state with default value', () => {
+      const { program, diagnostics } = parse(`
+        actor Counter {
+          state count: i64 = 0
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const state_ = (program.items[0] as any).members[0];
+      expect(state_.kind).toBe('StateDecl');
+      expect(state_.initializer).not.toBeNull();
+      expect(state_.initializer.kind).toBe('IntLiteral');
+      expect(state_.initializer.value).toBe('0');
+    });
+  });
+
+  describe('struct fields with defaults', () => {
+    it('parses struct field with default value', () => {
+      const { program, diagnostics } = parse(`
+        type Config {
+          timeout: i32 = 30,
+          retries: i32 = 3,
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const td = program.items[0] as any;
+      expect(td.body.fields[0].defaultValue).not.toBeNull();
+      expect(td.body.fields[0].defaultValue.kind).toBe('IntLiteral');
+      expect(td.body.fields[1].defaultValue.value).toBe('3');
+    });
+  });
+
+  describe('multiple top-level items', () => {
+    it('parses multiple declarations in one file', () => {
+      const { program, diagnostics } = parse(`
+        use std::io::*;
+
+        type Config {
+          host: String,
+          port: u16,
+        }
+
+        fn main() {
+          let cfg = Config { host: "localhost", port: 8080 };
+        }
+
+        actor Server {
+          state config: Config
+
+          on Start() {
+            let x = 1;
+          }
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      expect(program.items).toHaveLength(4);
+      expect(program.items[0]!.kind).toBe('UseDecl');
+      expect(program.items[1]!.kind).toBe('TypeDecl');
+      expect(program.items[2]!.kind).toBe('FunctionDecl');
+      expect(program.items[3]!.kind).toBe('ActorDecl');
+    });
+  });
+
+  describe('empty function body', () => {
+    it('parses function with empty body', () => {
+      const { program, diagnostics } = parse(`fn noop() {}`);
+      expect(diagnostics).toHaveLength(0);
+      const fn_ = program.items[0] as any;
+      expect(fn_.body.statements).toHaveLength(0);
+    });
+  });
+
+  describe('parenthesized expressions', () => {
+    it('parses grouped expressions', () => {
+      const { program } = parse(`fn f() { let x = (1 + 2) * 3; }`);
+      const fn_ = program.items[0] as any;
+      const init = fn_.body.statements[0].initializer;
+      expect(init.kind).toBe('Binary');
+      expect(init.operator).toBe('*');
+      expect(init.left.kind).toBe('Binary');
+      expect(init.left.operator).toBe('+');
+    });
+  });
+
+  describe('complex real-world examples', () => {
+    it('parses a DeFi lending protocol contract', () => {
+      const { program, diagnostics } = parse(`
+        use math::safe::{SafeAdd, SafeSub};
+
+        contract LendingPool : ERC20 {
+          state deposits: Map<Address, u256>
+          state total_locked: u256
+
+          #[intent("Deposit tokens into the lending pool")]
+          #[pre(amount > 0)]
+          pub fn deposit(amount: u256) -> Result {
+            deposits[caller] += amount;
+            total_locked += amount;
+            emit Deposit(caller, amount);
+            return Ok(true);
+          }
+
+          #[intent("Withdraw tokens from the lending pool")]
+          pub fn withdraw(amount: u256) -> Result {
+            verify!(deposits[caller] >= amount, "insufficient deposit");
+            deposits[caller] -= amount;
+            total_locked -= amount;
+            emit Withdrawal(caller, amount);
+            return Ok(true);
+          }
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      expect(program.items).toHaveLength(2);
+      expect(program.items[0]!.kind).toBe('UseDecl');
+      const contract = program.items[1] as any;
+      expect(contract.kind).toBe('ContractDecl');
+      expect(contract.members).toHaveLength(4);
+    });
+
+    it('parses actor supervision tree', () => {
+      const { program, diagnostics } = parse(`
+        actor AppSupervisor {
+          state running: bool = true
+
+          supervise Database {
+            restart: always,
+            max_restarts: 3,
+          }
+
+          supervise WebServer {
+            restart: always,
+          }
+
+          on Shutdown() {
+            running = false;
+          }
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const actor = program.items[0] as any;
+      expect(actor.members).toHaveLength(4);
+      expect(actor.members[0].kind).toBe('StateDecl');
+      expect(actor.members[1].kind).toBe('SuperviseDecl');
+      expect(actor.members[2].kind).toBe('SuperviseDecl');
+      expect(actor.members[3].kind).toBe('OnHandler');
+    });
+
+    it('parses server with HTTP handlers', () => {
+      const { program, diagnostics } = parse(`
+        server RestApi {
+          state db: Database
+
+          #[get("/users")]
+          pub fn list_users() -> Vec<User> {
+            return db.query_all();
+          }
+
+          #[post("/users")]
+          pub fn create_user(name: String, email: String) -> Result {
+            return db.insert(name, email);
+          }
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const server = program.items[0] as any;
+      expect(server.kind).toBe('ServerDecl');
+      expect(server.members).toHaveLength(3);
+      expect(server.members[1].annotations[0].name).toBe('get');
+      expect(server.members[2].annotations[0].name).toBe('post');
+    });
+  });
+
   describe('error recovery', () => {
     it('recovers from errors and continues parsing', () => {
       const { program, diagnostics } = parse(`
@@ -550,6 +1306,21 @@ describe('Parser', () => {
       expect(diagnostics.length).toBeGreaterThan(0);
       const fns = program.items.filter(i => i.kind === 'FunctionDecl');
       expect(fns.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('recovers from missing closing brace', () => {
+      const { diagnostics } = parse(`
+        fn broken() { let x = 1;
+        fn next() { let y = 2; }
+      `);
+      expect(diagnostics.length).toBeGreaterThan(0);
+    });
+
+    it('reports error on unexpected top-level token', () => {
+      const { diagnostics } = parse(`
+        42
+      `);
+      expect(diagnostics.length).toBeGreaterThan(0);
     });
   });
 });
