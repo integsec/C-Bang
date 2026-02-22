@@ -16,7 +16,7 @@
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { Lexer, TokenType, VERSION } from './index.js';
+import { Lexer, TokenType, Parser, formatDiagnostic, VERSION } from './index.js';
 
 function main(): void {
   const args = process.argv.slice(2);
@@ -52,9 +52,16 @@ function main(): void {
       checkCommand(file);
       break;
 
+    case 'parse':
+      if (!file) {
+        console.error('Error: missing file argument');
+        process.exit(1);
+      }
+      parseCommand(file);
+      break;
+
     case 'run':
     case 'build':
-    case 'parse':
     case 'verify':
     case 'audit':
       console.log(`'cbang ${command}' is not yet implemented.`);
@@ -86,21 +93,49 @@ function lexCommand(filePath: string): void {
   console.log(`\n${tokenCount} tokens, ${errorCount} errors`);
 }
 
+function parseCommand(filePath: string): void {
+  const source = readSource(filePath);
+  const lexer = new Lexer(source, filePath);
+  const tokens = lexer.tokenize();
+  const parser = new Parser(tokens);
+  const { program, diagnostics } = parser.parse();
+
+  if (diagnostics.length > 0) {
+    for (const d of diagnostics) {
+      console.error(formatDiagnostic(d, source));
+    }
+  }
+
+  console.log(JSON.stringify(program, null, 2));
+  console.log(`\n${program.items.length} top-level items, ${diagnostics.length} errors`);
+}
+
 function checkCommand(filePath: string): void {
   const source = readSource(filePath);
   const lexer = new Lexer(source, filePath);
   const tokens = lexer.tokenize();
 
-  const errors = tokens.filter(t => t.type === TokenType.Error);
-  if (errors.length > 0) {
-    for (const err of errors) {
+  const lexErrors = tokens.filter(t => t.type === TokenType.Error);
+  if (lexErrors.length > 0) {
+    for (const err of lexErrors) {
       console.error(`Error at ${err.span.start.line}:${err.span.start.column}: unexpected character '${err.value}'`);
     }
     process.exit(1);
   }
 
   console.log(`✓ Lexing passed (${tokens.length} tokens)`);
-  console.log('⚠ Parser not yet implemented');
+
+  const parser = new Parser(tokens);
+  const { program, diagnostics } = parser.parse();
+
+  if (diagnostics.length > 0) {
+    for (const d of diagnostics) {
+      console.error(formatDiagnostic(d, source));
+    }
+    process.exit(1);
+  }
+
+  console.log(`✓ Parsing passed (${program.items.length} top-level items)`);
   console.log('⚠ Type checker not yet implemented');
 }
 
@@ -124,7 +159,7 @@ USAGE:
 COMMANDS:
   check <file.cb>     Type-check a file
   lex <file.cb>       Show tokens (debug)
-  parse <file.cb>     Show AST (debug)  [not yet implemented]
+  parse <file.cb>     Show AST (debug)
   run <file.cb>       Build and run      [not yet implemented]
   build <file.cb>     Compile to target  [not yet implemented]
   verify <file.cb>    Formal verification [not yet implemented]

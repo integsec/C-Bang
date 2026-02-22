@@ -5,7 +5,10 @@
  * with security by construction.
  */
 
-export { Lexer, Token, TokenType } from './lexer/index.js';
+export { Lexer, TokenType } from './lexer/index.js';
+export type { Token, Position, Span } from './lexer/index.js';
+export { Parser } from './parser/index.js';
+export type * from './ast/index.js';
 export { formatDiagnostic, createError, createWarning } from './errors/index.js';
 
 export const VERSION = '0.1.0';

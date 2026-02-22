@@ -12,7 +12,7 @@ export interface Diagnostic {
   message: string;
   span: Span;
   notes: string[];
-  suggestion?: string;
+  suggestion?: string | undefined;
 }
 
 export function formatDiagnostic(diagnostic: Diagnostic, source: string): string {

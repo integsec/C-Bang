@@ -5,7 +5,7 @@
  * with position information for error reporting.
  */
 
-import { Token, TokenType, Position, Span, lookupKeyword } from './token.js';
+import { type Token, TokenType, type Position, lookupKeyword } from './token.js';
 
 export class Lexer {
   private source: string;

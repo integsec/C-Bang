@@ -1,2 +1,3 @@
 export { Lexer } from './lexer.js';
-export { Token, TokenType, Position, Span, lookupKeyword } from './token.js';
+export { TokenType, lookupKeyword } from './token.js';
+export type { Token, Position, Span } from './token.js';
