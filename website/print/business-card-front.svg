@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1050 600" width="1050" height="600">
+  <!-- 1050x600 = 3.5x2 inches at 300dpi. Min readable font ~25px (6pt) -->
   <defs>
     <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#6366f1"/>
@@ -11,20 +12,20 @@
       <stop offset="60%" style="stop-color:#1a1030"/>
       <stop offset="100%" style="stop-color:#0a0a0f"/>
     </linearGradient>
-    <radialGradient id="orb1" cx="15%" cy="25%" r="35%">
+    <radialGradient id="orb1" cx="20%" cy="30%" r="40%">
       <stop offset="0%" style="stop-color:#6366f1;stop-opacity:0.12"/>
       <stop offset="100%" style="stop-color:#6366f1;stop-opacity:0"/>
     </radialGradient>
-    <radialGradient id="orb2" cx="85%" cy="75%" r="35%">
+    <radialGradient id="orb2" cx="80%" cy="70%" r="40%">
       <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:0.10"/>
       <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:0"/>
     </radialGradient>
     <filter id="bangGlow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feGaussianBlur stdDeviation="8" result="blur"/>
       <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
-    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.02)" stroke-width="0.5"/>
+    <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+      <path d="M 50 0 L 0 0 0 50" fill="none" stroke="rgba(255,255,255,0.02)" stroke-width="0.5"/>
     </pattern>
   </defs>
 
@@ -33,97 +34,43 @@
   <rect width="1050" height="600" fill="url(#orb1)"/>
   <rect width="1050" height="600" fill="url(#orb2)"/>
   <rect width="1050" height="600" fill="url(#grid)"/>
-  <rect x="6" y="6" width="1038" height="588" rx="12" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
+  <rect x="8" y="8" width="1034" height="584" rx="14" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
 
-  <!-- Top row: Logo + headline -->
-  <text x="52" y="68" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="800" font-size="58" letter-spacing="-2" fill="url(#logoGrad)">C</text>
-  <text x="92" y="68" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="800" font-size="58" fill="#22d3a0" filter="url(#bangGlow)">!</text>
-  <text x="155" y="50" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="800" font-size="20" fill="rgba(255,255,255,0.95)">The AI-Native Programming Language</text>
-  <text x="155" y="72" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="500" font-size="13" fill="rgba(255,255,255,0.5)">What if security wasn't an afterthought — but built into every line of code?</text>
+  <!-- Logo: big and centered -->
+  <text x="458" y="168" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="800" font-size="150" letter-spacing="-4" text-anchor="end" fill="url(#logoGrad)">C</text>
+  <text x="470" y="168" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="800" font-size="150" text-anchor="start" fill="#22d3a0" filter="url(#bangGlow)">!</text>
 
-  <!-- Separator -->
-  <rect x="52" y="88" width="946" height="1" rx="0.5" fill="rgba(255,255,255,0.06)"/>
+  <!-- Tagline: ~10pt -->
+  <text x="525" y="220" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="700" font-size="42" text-anchor="middle" fill="rgba(255,255,255,0.95)">The AI-Native Programming Language</text>
 
-  <!-- Code example -->
-  <rect x="52" y="100" width="946" height="72" rx="6" fill="rgba(13,13,22,0.85)" stroke="rgba(42,42,62,0.35)" stroke-width="0.5"/>
-  <circle cx="70" cy="113" r="3.5" fill="#ef4444" opacity="0.6"/>
-  <circle cx="82" cy="113" r="3.5" fill="#f59e0b" opacity="0.6"/>
-  <circle cx="94" cy="113" r="3.5" fill="#22d3a0" opacity="0.6"/>
-  <text x="68" y="136" font-family="JetBrains Mono, Fira Code, Consolas, monospace" font-size="10.5">
-    <tspan fill="#6a6a80">#[intent("Transfer ownership, ensuring the token can never be spent twice")]</tspan>
+  <!-- Subtitle: ~8pt -->
+  <text x="525" y="260" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="500" font-size="30" text-anchor="middle" fill="rgba(255,255,255,0.45)">Security by Construction</text>
+
+  <!-- Feature chips: ~7pt text -->
+  <rect x="150" y="290" width="200" height="42" rx="21" fill="rgba(255,255,255,0.04)" stroke="rgba(99,102,241,0.3)" stroke-width="1"/>
+  <text x="250" y="317" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="600" font-size="26" text-anchor="middle" fill="#a5b4fc">Linear Types</text>
+
+  <rect x="370" y="290" width="200" height="42" rx="21" fill="rgba(255,255,255,0.04)" stroke="rgba(34,211,160,0.3)" stroke-width="1"/>
+  <text x="470" y="317" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="600" font-size="26" text-anchor="middle" fill="#6ee7b7">Actor Model</text>
+
+  <rect x="590" y="290" width="310" height="42" rx="21" fill="rgba(255,255,255,0.04)" stroke="rgba(139,92,246,0.3)" stroke-width="1"/>
+  <text x="745" y="317" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="600" font-size="26" text-anchor="middle" fill="#c4b5fd">Universal Deployment</text>
+
+  <!-- Code snippet: ~6.5pt mono -->
+  <rect x="80" y="355" width="890" height="80" rx="10" fill="rgba(13,13,22,0.85)" stroke="rgba(42,42,62,0.4)" stroke-width="1"/>
+  <text x="105" y="388" font-family="JetBrains Mono, Fira Code, Consolas, monospace" font-size="25">
+    <tspan fill="#8b5cf6">fn</tspan><tspan fill="#e8e8f0"> transfer(token: </tspan><tspan fill="#22d3a0">own</tspan><tspan fill="#e8e8f0"> Token, to: Address)</tspan>
   </text>
-  <text x="68" y="152" font-family="JetBrains Mono, Fira Code, Consolas, monospace" font-size="10.5">
-    <tspan fill="#8b5cf6">fn</tspan><tspan fill="#e8e8f0"> transfer(token: </tspan><tspan fill="#22d3a0">own</tspan><tspan fill="#e8e8f0"> Token, to: Address) -> </tspan><tspan fill="#a5b4fc">Result</tspan><tspan fill="#e8e8f0">&lt;Receipt, Error&gt;</tspan>
-  </text>
-  <text x="68" y="166" font-family="JetBrains Mono, Fira Code, Consolas, monospace" font-size="10.5">
-    <tspan fill="#e8e8f0">    { ledger.transfer(</tspan><tspan fill="#22d3a0">move</tspan><tspan fill="#e8e8f0"> token, to) }</tspan><tspan fill="#6a6a80">  // moved, not copied — double-spend impossible</tspan>
+  <text x="105" y="420" font-family="JetBrains Mono, Fira Code, Consolas, monospace" font-size="25">
+    <tspan fill="#e8e8f0">    -> </tspan><tspan fill="#a5b4fc">Result</tspan><tspan fill="#e8e8f0">&lt;Receipt, Error&gt; </tspan><tspan fill="#6a6a80">// moved, never copied</tspan>
   </text>
 
-  <!-- Three feature columns -->
-  <!-- Linear Types -->
-  <rect x="52" y="186" width="306" height="108" rx="8" fill="rgba(255,255,255,0.025)" stroke="rgba(99,102,241,0.2)" stroke-width="0.5"/>
-  <text x="64" y="210" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="700" font-size="14" fill="#a5b4fc">Linear Types</text>
-  <text x="64" y="228" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="10" fill="rgba(255,255,255,0.6)">Zero-cost memory safety. No garbage collector,</text>
-  <text x="64" y="242" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="10" fill="rgba(255,255,255,0.6)">no runtime overhead. The compiler guarantees</text>
-  <text x="64" y="256" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="10" fill="rgba(255,255,255,0.6)">every resource is used exactly once — use-after-</text>
-  <text x="64" y="270" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="10" fill="rgba(255,255,255,0.6)">free and double-free bugs simply can't compile.</text>
-  <text x="64" y="286" font-family="JetBrains Mono, Consolas, monospace" font-size="9" fill="rgba(34,211,160,0.5)">token: own Token  // ownership enforced</text>
+  <!-- CTA: ~7pt -->
+  <text x="525" y="485" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="700" font-size="30" text-anchor="middle" fill="#22d3a0">Humans &amp; Agents Welcome</text>
 
-  <!-- Actor Model -->
-  <rect x="372" y="186" width="306" height="108" rx="8" fill="rgba(255,255,255,0.025)" stroke="rgba(34,211,160,0.2)" stroke-width="0.5"/>
-  <text x="384" y="210" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="700" font-size="14" fill="#6ee7b7">Actor Model Concurrency</text>
-  <text x="384" y="228" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="10" fill="rgba(255,255,255,0.6)">Built-in safe parallelism. Actors are isolated</text>
-  <text x="384" y="242" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="10" fill="rgba(255,255,255,0.6)">units that communicate via messages — no</text>
-  <text x="384" y="256" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="10" fill="rgba(255,255,255,0.6)">shared mutable state, no data races, no</text>
-  <text x="384" y="270" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="10" fill="rgba(255,255,255,0.6)">deadlocks. Concurrency that's correct by design.</text>
-  <text x="384" y="286" font-family="JetBrains Mono, Consolas, monospace" font-size="9" fill="rgba(139,92,246,0.5)">actor OrderProcessor { on Process(..) }</text>
+  <!-- URLs: ~8pt -->
+  <text x="525" y="535" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="600" font-size="32" text-anchor="middle" fill="rgba(255,255,255,0.7)" letter-spacing="0.5">c-bang.integsec.com</text>
 
-  <!-- Universal Deployment -->
-  <rect x="692" y="186" width="306" height="108" rx="8" fill="rgba(255,255,255,0.025)" stroke="rgba(139,92,246,0.2)" stroke-width="0.5"/>
-  <text x="704" y="210" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="700" font-size="14" fill="#c4b5fd">Universal Deployment</text>
-  <text x="704" y="228" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="10" fill="rgba(255,255,255,0.6)">Write once, deploy everywhere. The same C!</text>
-  <text x="704" y="242" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="10" fill="rgba(255,255,255,0.6)">code compiles to native binaries, WebAssembly</text>
-  <text x="704" y="256" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="10" fill="rgba(255,255,255,0.6)">for browsers, or EVM bytecode for blockchain</text>
-  <text x="704" y="270" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="10" fill="rgba(255,255,255,0.6)">smart contracts. One language, every platform.</text>
-  <text x="704" y="286" font-family="JetBrains Mono, Consolas, monospace" font-size="9" fill="rgba(77,124,255,0.5)">#[target(native, wasm, evm)]</text>
-
-  <!-- AI + Effect System row -->
-  <rect x="52" y="308" width="476" height="70" rx="8" fill="rgba(34,211,160,0.03)" stroke="rgba(34,211,160,0.15)" stroke-width="0.5"/>
-  <text x="64" y="330" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="700" font-size="13" fill="#22d3a0">AI-Native Intent Annotations</text>
-  <text x="64" y="348" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="10" fill="rgba(255,255,255,0.5)">Describe what your code should do in plain English. AI agents read these annotations</text>
-  <text x="64" y="362" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="10" fill="rgba(255,255,255,0.5)">to verify, audit, and collaborate on your code. Humans and machines, same language.</text>
-
-  <rect x="542" y="308" width="456" height="70" rx="8" fill="rgba(139,92,246,0.03)" stroke="rgba(139,92,246,0.15)" stroke-width="0.5"/>
-  <text x="554" y="330" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="700" font-size="13" fill="#c4b5fd">Effect System &amp; Refined Types</text>
-  <text x="554" y="348" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="10" fill="rgba(255,255,255,0.5)">Functions declare their side effects (IO, network, state). Types carry constraints</text>
-  <text x="554" y="362" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="10" fill="rgba(255,255,255,0.5)">(e.g., "a number between 1-100"). The compiler proves your code is correct.</text>
-
-  <!-- Stats row -->
-  <rect x="52" y="392" width="140" height="52" rx="8" fill="rgba(255,255,255,0.02)"/>
-  <text x="122" y="414" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="800" font-size="18" text-anchor="middle" fill="#a5b4fc">26+</text>
-  <text x="122" y="432" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="9" text-anchor="middle" fill="rgba(255,255,255,0.35)">Open Issues to Grab</text>
-
-  <rect x="204" y="392" width="140" height="52" rx="8" fill="rgba(255,255,255,0.02)"/>
-  <text x="274" y="414" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="800" font-size="18" text-anchor="middle" fill="#6ee7b7">75</text>
-  <text x="274" y="432" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="9" text-anchor="middle" fill="rgba(255,255,255,0.35)">Tests Passing</text>
-
-  <rect x="356" y="392" width="140" height="52" rx="8" fill="rgba(255,255,255,0.02)"/>
-  <text x="426" y="414" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="800" font-size="18" text-anchor="middle" fill="#c4b5fd">3</text>
-  <text x="426" y="432" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="9" text-anchor="middle" fill="rgba(255,255,255,0.35)">Compile Targets</text>
-
-  <!-- Right side of stats: what you can build -->
-  <text x="540" y="408" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="600" font-size="10" fill="rgba(255,255,255,0.4)">Build with C!:</text>
-  <text x="540" y="424" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="9.5" fill="rgba(255,255,255,0.35)">Smart Contracts · Web Apps · CLI Tools · Servers · APIs · Embedded Systems</text>
-  <text x="540" y="440" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="9.5" fill="rgba(255,255,255,0.35)">DeFi Protocols · Microservices · IoT · Anything you can imagine</text>
-
-  <!-- CTA -->
-  <rect x="52" y="462" width="946" height="44" rx="22" fill="rgba(34,211,160,0.08)" stroke="rgba(34,211,160,0.3)" stroke-width="0.7"/>
-  <text x="525" y="490" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="700" font-size="15" text-anchor="middle" fill="#22d3a0">Humans &amp; Agents Welcome — Pitch in some tokens. Let's build the future together.</text>
-
-  <!-- URLs -->
-  <text x="300" y="536" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="600" font-size="16" text-anchor="middle" fill="rgba(255,255,255,0.65)">c-bang.integsec.com</text>
-  <text x="700" y="536" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="600" font-size="16" text-anchor="middle" fill="rgba(255,255,255,0.65)">github.com/integsec/c-bang</text>
-
-  <!-- Footer -->
-  <text x="525" y="575" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="8.5" text-anchor="middle" fill="rgba(255,255,255,0.15)" letter-spacing="2.5">OPEN SOURCE  ·  AI-NATIVE  ·  SECURITY BY CONSTRUCTION  ·  BUILT FOR THE FUTURE</text>
+  <!-- Footer: ~6pt -->
+  <text x="525" y="572" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="400" font-size="22" text-anchor="middle" fill="rgba(255,255,255,0.25)" letter-spacing="2">OPEN SOURCE  ·  AI-NATIVE  ·  SECURE BY DESIGN</text>
 </svg>
