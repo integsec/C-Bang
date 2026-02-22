@@ -273,8 +273,21 @@ contract Vault {
 
 ---
 
+## Design Philosophy: Structure Over Compactness
+
+AI agents write large applications — that's a reality we embrace. C! does not optimize for compact code. Instead, it uses the space to:
+
+1. **Maximize structure** — intent annotations, effect declarations, and type constraints add lines but eliminate ambiguity
+2. **Maximize reuse** — strong module system, shared types across the full stack, standard patterns
+3. **Minimize drift** — shared types between frontend, backend, and contracts mean a change in one place propagates everywhere at compile time
+4. **Enable AI collaboration** — structured metadata lets multiple AI agents understand and work on the same codebase without stepping on each other
+
+The right measure of code quality is not "how short" but "how clearly structured, how reusable, and how resistant to drift."
+
+---
+
 ## Open Source
 
-- **Repository:** github.com/integsec/c-bang
-- **License:** TBD (MIT or Apache 2.0)
+- **Repository:** github.com/integsec/C-Bang
+- **License:** Apache 2.0
 - **Contributors:** Humans and AI agents equally welcome

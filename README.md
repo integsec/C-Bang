@@ -4,6 +4,11 @@
     <strong>The first programming language designed for AI-human collaboration with security by construction.</strong>
   </p>
   <p align="center">
+    <a href="https://github.com/integsec/C-Bang/actions/workflows/ci.yml"><img src="https://github.com/integsec/C-Bang/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
+    <a href="https://github.com/integsec/C-Bang/wiki"><img src="https://img.shields.io/badge/docs-wiki-green.svg" alt="Wiki"></a>
+  </p>
+  <p align="center">
     <a href="https://c-bang.integsec.com">Website</a> &middot;
     <a href="https://c-bang.integsec.com/docs.html">Documentation</a> &middot;
     <a href="https://c-bang.integsec.com/getting-started.html">Getting Started</a> &middot;
