@@ -3,7 +3,8 @@
     "allow": [
       "Bash(cd:*)",
       "Bash(cd \"/c/Work/C!\" && git pull origin main --allow-unrelated-histories 2>&1)",
-      "Bash(cd \"/c/Work/C!\" && git add LICENSE && git stash && git pull origin main --allow-unrelated-histories 2>&1)"
+      "Bash(cd \"/c/Work/C!\" && git add LICENSE && git stash && git pull origin main --allow-unrelated-histories 2>&1)",
+      "Bash(cd \"/c/Work/C!\" && git pull origin main --allow-unrelated-histories --no-edit 2>&1)"
     ]
   }
 }

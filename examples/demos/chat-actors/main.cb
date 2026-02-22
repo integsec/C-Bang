@@ -1,0 +1,179 @@
+// Chat Actors Demo — Real-time chat using C!'s actor model
+//
+// Demonstrates:
+// - Actor-based architecture
+// - Supervision trees
+// - WebSocket integration
+// - Message passing (no shared state)
+// - Fault tolerance
+
+type UserId = String{len: 1..50, matches: r"^[a-zA-Z0-9_]+$"}
+type RoomId = String{len: 1..50}
+
+type ChatMessage {
+    from: UserId,
+    room: RoomId,
+    text: String{len: 1..5000},
+    timestamp: DateTime,
+}
+
+type SystemEvent =
+    | UserJoined(UserId, RoomId)
+    | UserLeft(UserId, RoomId)
+    | RoomCreated(RoomId)
+    | ServerMessage(String)
+
+// === ACTORS ===
+
+// Each chat room is an actor — isolated state, no races
+actor Room {
+    state id: RoomId
+    state members: Map<UserId, ClientActor>
+    state history: Vec<ChatMessage>{len: ..500}  // bounded to last 500
+
+    on Join(user_id: UserId, client: ClientActor) {
+        members.insert(user_id, client);
+        broadcast(SystemEvent::UserJoined(user_id, id));
+
+        // Send history to new member
+        for msg in history {
+            client.send(Deliver(msg));
+        }
+    }
+
+    on Leave(user_id: UserId) {
+        if members.remove(user_id).is_some() {
+            broadcast(SystemEvent::UserLeft(user_id, id));
+        }
+    }
+
+    on Message(msg: ChatMessage) {
+        history.push(msg.clone());
+        broadcast_message(msg);
+    }
+
+    on GetMembers() -> Vec<UserId> {
+        reply members.keys().collect();
+    }
+
+    fn broadcast_message(msg: ChatMessage) {
+        for (_, client) in &members {
+            client.send(Deliver(msg.clone()));
+        }
+    }
+
+    fn broadcast(event: SystemEvent) {
+        for (_, client) in &members {
+            client.send(DeliverEvent(event.clone()));
+        }
+    }
+}
+
+// Each connected client is an actor
+actor ClientActor {
+    state user_id: UserId
+    state socket: WebSocket
+    state current_room: Option<Room>
+
+    on Deliver(msg: ChatMessage) {
+        socket.send_json(msg);
+    }
+
+    on DeliverEvent(event: SystemEvent) {
+        socket.send_json(event);
+    }
+
+    on Disconnect() {
+        if let Some(room) = current_room.take() {
+            room.send(Leave(user_id));
+        }
+    }
+}
+
+// Room manager — supervises all rooms
+actor RoomManager {
+    state rooms: Map<RoomId, Room>
+
+    on GetOrCreateRoom(id: RoomId) -> Room {
+        if let Some(room) = rooms.get(id) {
+            reply room.clone();
+        } else {
+            let room = spawn Room { id: id };
+            rooms.insert(id, room.clone());
+            reply room;
+        }
+    }
+
+    on ListRooms() -> Vec<RoomId> {
+        reply rooms.keys().collect();
+    }
+
+    // If a room crashes, restart it (members will need to reconnect)
+    supervise Room { restart: .always, max_restarts: 3 per .minute }
+}
+
+// === SERVER ===
+
+server ChatServer {
+    bind: "0.0.0.0:8080"
+
+    #[intent("Serve the chat UI")]
+    #[get("/")]
+    fn index() -> Html {
+        render_template("index.html")
+    }
+
+    #[intent("List all active chat rooms")]
+    #[get("/api/rooms")]
+    fn list_rooms() -> Result<Vec<RoomId>> {
+        let rooms = room_manager.ask(ListRooms()).await;
+        Ok(rooms)
+    }
+
+    #[intent("WebSocket endpoint for real-time chat")]
+    #[ws("/ws")]
+    fn chat_socket(conn: WebSocket, user_id: UserId) {
+        let client = spawn ClientActor {
+            user_id: user_id,
+            socket: conn,
+            current_room: None,
+        };
+
+        conn.on_message(|msg| {
+            match msg.parse::<ChatCommand>() {
+                Join(room_id) => {
+                    let room = room_manager.ask(GetOrCreateRoom(room_id)).await;
+                    room.send(Join(user_id, client.clone()));
+                }
+                Send(text) => {
+                    if let Some(room) = client.current_room {
+                        room.send(Message(ChatMessage {
+                            from: user_id,
+                            room: room.id,
+                            text: text,
+                            timestamp: DateTime::now(),
+                        }));
+                    }
+                }
+                Leave => {
+                    client.send(Disconnect());
+                }
+            }
+        });
+    }
+}
+
+// === APPLICATION ===
+
+#[intent("Start the chat server with room management and supervision")]
+fn main() {
+    let room_manager = spawn RoomManager();
+
+    // Pre-create some default rooms
+    room_manager.send(GetOrCreateRoom("general"));
+    room_manager.send(GetOrCreateRoom("random"));
+    room_manager.send(GetOrCreateRoom("c-bang"));
+
+    print("Chat server starting on http://localhost:8080");
+    ChatServer::start(room_manager);
+}

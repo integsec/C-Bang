@@ -1,0 +1,211 @@
+// Todo App — Full-stack web application in C!
+//
+// Demonstrates:
+// - Shared types across frontend and backend
+// - Server routes with authentication
+// - WASM frontend components
+// - Reactive state management
+// - Type-safe API calls
+
+// === SHARED TYPES ===
+
+type TodoId = UUID
+
+type Priority = Low | Medium | High | Critical
+
+type Todo {
+    id: TodoId,
+    title: String{len: 1..200},
+    description: Option<String{len: ..2000}>,
+    completed: bool,
+    priority: Priority,
+    created_at: DateTime,
+}
+
+type CreateTodo {
+    title: String{len: 1..200},
+    description: Option<String{len: ..2000}>,
+    priority: Priority,
+}
+
+type ApiError =
+    | NotFound(String)
+    | Unauthorized
+    | ValidationError(String)
+
+// === BACKEND ===
+
+server TodoServer {
+    bind: "0.0.0.0:3000"
+
+    middleware [
+        Cors { origins: ["*"] },
+        Logger,
+    ]
+
+    #[intent("List all todos, optionally filtered by completion status")]
+    #[get("/api/todos")]
+    fn list_todos(completed: Option<bool>) -> Result<Vec<Todo>, ApiError> with Database {
+        match completed {
+            Some(status) => db.query::<Todo>().filter(|t| t.completed == status).all(),
+            None => db.query::<Todo>().all(),
+        }
+    }
+
+    #[intent("Create a new todo item with auto-generated ID and timestamp")]
+    #[post("/api/todos")]
+    #[validate]
+    fn create_todo(body: CreateTodo) -> Result<Todo, ApiError> with Database {
+        let todo = Todo {
+            id: UUID::new(),
+            title: body.title,
+            description: body.description,
+            completed: false,
+            priority: body.priority,
+            created_at: DateTime::now(),
+        };
+        db.insert(todo)
+    }
+
+    #[intent("Toggle a todo's completion status")]
+    #[patch("/api/todos/:id/toggle")]
+    fn toggle_todo(id: TodoId) -> Result<Todo, ApiError> with Database {
+        let todo = db.find::<Todo>(id)
+            .ok_or(NotFound("Todo not found"))?;
+        let updated = Todo { completed: !todo.completed, ..todo };
+        db.update(updated)
+    }
+
+    #[intent("Delete a todo permanently")]
+    #[delete("/api/todos/:id")]
+    fn delete_todo(id: TodoId) -> Result<(), ApiError> with Database {
+        db.delete::<Todo>(id)
+            .ok_or(NotFound("Todo not found"))
+    }
+}
+
+// === FRONTEND ===
+
+state AppState {
+    todos: Vec<Todo> = [],
+    filter: TodoFilter = TodoFilter::All,
+    new_title: String = "",
+}
+
+type TodoFilter = All | Active | Completed
+
+component App {
+    style {
+        .app { max-width: 600px; margin: 0 auto; padding: 2rem; }
+        .header { text-align: center; margin-bottom: 2rem; }
+        .input-row { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+        .input { flex: 1; padding: 0.75rem; border-radius: 8px; }
+        .btn { padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer; }
+    }
+
+    <div class="app">
+        <h1 class="header">"C! Todo App"</h1>
+
+        <div class="input-row">
+            <input
+                class="input"
+                placeholder="What needs to be done?"
+                value={state.new_title}
+                on:input={|e| state.new_title = e.value}
+                on:keydown={|e| if e.key == "Enter" { add_todo() }}
+            />
+            <button class="btn" on:click={add_todo}>"Add"</button>
+        </div>
+
+        <FilterBar current={state.filter} on:change={|f| state.filter = f} />
+
+        {for todo in filtered_todos() {
+            <TodoItem todo={todo} on:toggle={toggle} on:delete={delete} />
+        }}
+
+        <p>"{active_count()} items remaining"</p>
+    </div>
+}
+
+component TodoItem(todo: Todo, on_toggle: fn(TodoId), on_delete: fn(TodoId)) {
+    style {
+        .todo { display: flex; align-items: center; gap: 1rem; padding: 0.75rem; }
+        .completed { text-decoration: line-through; opacity: 0.6; }
+    }
+
+    let class = if todo.completed { "todo completed" } else { "todo" };
+
+    <div class={class}>
+        <input
+            type="checkbox"
+            checked={todo.completed}
+            on:change={|| on_toggle(todo.id)}
+        />
+        <span style="flex: 1">{todo.title}</span>
+        <PriorityBadge priority={todo.priority} />
+        <button on:click={|| on_delete(todo.id)}>"x"</button>
+    </div>
+}
+
+component PriorityBadge(priority: Priority) {
+    let (color, label) = match priority {
+        Low      => ("#22c55e", "Low"),
+        Medium   => ("#eab308", "Med"),
+        High     => ("#f97316", "High"),
+        Critical => ("#ef4444", "Crit"),
+    };
+
+    <span style="color: {color}; font-weight: bold; font-size: 0.8rem;">
+        {label}
+    </span>
+}
+
+component FilterBar(current: TodoFilter, on_change: fn(TodoFilter)) {
+    style {
+        .filters { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+        .active { font-weight: bold; text-decoration: underline; }
+    }
+
+    <div class="filters">
+        {for filter in [TodoFilter::All, TodoFilter::Active, TodoFilter::Completed] {
+            let class = if filter == current { "active" } else { "" };
+            <button class={class} on:click={|| on_change(filter)}>
+                {filter.to_string()}
+            </button>
+        }}
+    </div>
+}
+
+// Helper functions
+fn filtered_todos() -> Vec<Todo> {
+    match state.filter {
+        All       => state.todos,
+        Active    => state.todos.filter(|t| !t.completed),
+        Completed => state.todos.filter(|t| t.completed),
+    }
+}
+
+fn active_count() -> usize {
+    state.todos.filter(|t| !t.completed).len()
+}
+
+async fn add_todo() {
+    if state.new_title.is_empty() { return; }
+    let todo = api::post("/api/todos", CreateTodo {
+        title: state.new_title,
+        description: None,
+        priority: Medium,
+    }).await?;
+    state.todos.push(todo);
+    state.new_title = "";
+}
+
+async fn toggle(id: TodoId) {
+    let updated = api::patch("/api/todos/{id}/toggle").await?;
+    state.todos.replace(|t| t.id == id, updated);
+}
+
+async fn delete(id: TodoId) {
+    api::delete("/api/todos/{id}").await?;
+    state.todos.remove(|t| t.id == id);
+}

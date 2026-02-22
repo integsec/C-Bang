@@ -1,0 +1,289 @@
+// Fullstack App Demo — Blog platform with auth, database, and smart contract
+//
+// Demonstrates ALL of C!'s capabilities in one application:
+// - Full-stack unified types
+// - Backend with auth middleware
+// - Frontend WASM components
+// - Smart contract for content hashing (proof of authorship)
+// - Actor-based background processing
+// - Intent annotations throughout
+
+// === SHARED TYPES ===
+
+type PostId = UUID
+type AuthorId = UUID
+type Slug = String{len: 1..100, matches: r"^[a-z0-9-]+$"}
+
+type Post {
+    id: PostId,
+    title: String{len: 1..200},
+    slug: Slug,
+    content: String{len: 1..50000},
+    author: AuthorId,
+    published: bool,
+    created_at: DateTime,
+    updated_at: DateTime,
+    content_hash: Option<Hash>,  // on-chain proof of authorship
+}
+
+type CreatePost {
+    title: String{len: 1..200},
+    content: String{len: 1..50000},
+}
+
+type Author {
+    id: AuthorId,
+    name: String{len: 1..100},
+    email: Email,
+    bio: Option<String{len: ..500}>,
+}
+
+type Role = Admin | Author | Reader
+
+type ApiError =
+    | NotFound(String)
+    | Unauthorized
+    | Forbidden(String)
+    | ValidationError(Vec<String>)
+
+// === SMART CONTRACT (proof of authorship) ===
+
+contract ContentRegistry {
+    state content_hashes: Map<Hash, ContentRecord>
+
+    type ContentRecord {
+        author: Address,
+        timestamp: u256,
+        content_hash: Hash,
+    }
+
+    #[intent("Register content hash on-chain as proof of authorship.
+             Once registered, the author and timestamp are immutable.")]
+    #[invariant(forall h: Hash => content_hashes[h].author != Address::zero()
+                implies content_hashes[h].timestamp > 0)]
+    pub fn register(content_hash: Hash) -> Result<ContentRecord> {
+        verify!(!content_hashes.contains(content_hash),
+                "Content already registered");
+
+        let record = ContentRecord {
+            author: caller,
+            timestamp: block.timestamp,
+            content_hash: content_hash,
+        };
+        content_hashes[content_hash] = record;
+
+        emit ContentRegistered(caller, content_hash, block.timestamp);
+        Ok(record)
+    }
+
+    pub pure fn verify_authorship(content_hash: Hash) -> Option<ContentRecord> {
+        content_hashes.get(content_hash)
+    }
+}
+
+// === BACKGROUND ACTOR (content processing) ===
+
+actor ContentProcessor {
+    on ProcessPost(post: Post) {
+        // Generate slug from title
+        let slug = slugify(post.title);
+
+        // Hash content for blockchain registration
+        let hash = crypto::sha256(post.content);
+
+        // Register on-chain (async)
+        let record = content_registry.ask(Register(hash)).await;
+
+        // Update post with hash
+        db.update(Post { content_hash: Some(hash), slug: slug, ..post });
+    }
+
+    on GeneratePreview(post: Post) -> String {
+        let preview = post.content.truncate(300);
+        reply "{preview}...";
+    }
+}
+
+// === BACKEND ===
+
+server BlogServer {
+    bind: "0.0.0.0:3000"
+
+    middleware [
+        Cors { origins: ["https://myblog.com"] },
+        RateLimit { max: 100 per .minute },
+        Auth { strategy: JWT, secret_env: "JWT_SECRET" },
+        Logger,
+    ]
+
+    // Public routes
+    #[intent("List published posts, paginated")]
+    #[get("/api/posts")]
+    fn list_posts(page: u32{1..} = 1, per_page: u32{1..50} = 20)
+        -> Result<Vec<Post>, ApiError> with Database
+    {
+        db.query::<Post>()
+          .filter(|p| p.published)
+          .order_by(|p| p.created_at, .desc)
+          .paginate(page, per_page)
+          .all()
+    }
+
+    #[intent("Get a single post by slug")]
+    #[get("/api/posts/:slug")]
+    fn get_post(slug: Slug) -> Result<Post, ApiError> with Database {
+        db.query::<Post>()
+          .filter(|p| p.slug == slug && p.published)
+          .first()
+          .ok_or(NotFound("Post not found"))
+    }
+
+    // Authenticated routes
+    #[intent("Create a new blog post. Author only. Triggers background
+             processing for slug generation and blockchain registration.")]
+    #[post("/api/posts")]
+    #[auth(Role::Author)]
+    #[validate]
+    fn create_post(body: CreatePost, user: AuthUser)
+        -> Result<Post, ApiError> with Database
+    {
+        let post = Post {
+            id: UUID::new(),
+            title: body.title,
+            slug: slugify(body.title),  // temporary, processor will finalize
+            content: body.content,
+            author: user.id,
+            published: false,
+            created_at: DateTime::now(),
+            updated_at: DateTime::now(),
+            content_hash: None,
+        };
+
+        let saved = db.insert(post)?;
+
+        // Background processing — non-blocking
+        content_processor.send(ProcessPost(saved.clone()));
+
+        Ok(saved)
+    }
+
+    #[intent("Publish a draft post. Only the author can publish their own posts.")]
+    #[patch("/api/posts/:id/publish")]
+    #[auth(Role::Author)]
+    fn publish_post(id: PostId, user: AuthUser)
+        -> Result<Post, ApiError> with Database
+    {
+        let post = db.find::<Post>(id)
+            .ok_or(NotFound("Post not found"))?;
+
+        verify!(post.author == user.id,
+                Forbidden("Can only publish your own posts"));
+
+        let published = Post {
+            published: true,
+            updated_at: DateTime::now(),
+            ..post
+        };
+
+        db.update(published)
+    }
+
+    // Verification endpoint
+    #[intent("Verify authorship of a post using blockchain proof")]
+    #[get("/api/posts/:id/verify")]
+    fn verify_authorship(id: PostId)
+        -> Result<Option<ContentRecord>, ApiError> with Database
+    {
+        let post = db.find::<Post>(id)
+            .ok_or(NotFound("Post not found"))?;
+
+        match post.content_hash {
+            Some(hash) => {
+                let record = content_registry
+                    .ask(VerifyAuthorship(hash)).await;
+                Ok(record)
+            }
+            None => Ok(None)
+        }
+    }
+}
+
+// === FRONTEND ===
+
+state AppState {
+    posts: Vec<Post> = [],
+    current_post: Option<Post> = None,
+    user: Option<Author> = None,
+    page: u32 = 1,
+}
+
+component BlogApp {
+    style {
+        .blog { max-width: 800px; margin: 0 auto; font-family: serif; }
+        .header { border-bottom: 2px solid #333; padding: 1rem 0; }
+        .post-card { padding: 1.5rem 0; border-bottom: 1px solid #eee; }
+        .title { font-size: 1.8rem; margin-bottom: 0.5rem; }
+        .meta { color: #666; font-size: 0.9rem; }
+        .verified { color: #22c55e; font-weight: bold; }
+    }
+
+    <div class="blog">
+        <header class="header">
+            <h1>"C! Blog"</h1>
+            <nav>
+                <a href="/">"Home"</a>
+                {match state.user {
+                    Some(u) => <a href="/write">"Write"</a>,
+                    None    => <a href="/login">"Login"</a>,
+                }}
+            </nav>
+        </header>
+
+        {for post in state.posts {
+            <PostCard post={post} />
+        }}
+
+        <Pagination
+            page={state.page}
+            on:next={|| load_posts(state.page + 1)}
+            on:prev={|| if state.page > 1 { load_posts(state.page - 1) }}
+        />
+    </div>
+}
+
+component PostCard(post: Post) {
+    <article class="post-card">
+        <h2 class="title">
+            <a href="/posts/{post.slug}">{post.title}</a>
+        </h2>
+        <div class="meta">
+            {post.created_at.format("MMM DD, YYYY")}
+            {match post.content_hash {
+                Some(_) => <span class="verified">" Verified on-chain"</span>,
+                None    => <span>"",
+            }}
+        </div>
+        <p>{post.content.truncate(200)}..."</p>
+    </article>
+}
+
+router {
+    "/"             => BlogApp,
+    "/posts/:slug"  => PostView(slug),
+    "/write"        => PostEditor [auth: Role::Author],
+    "/login"        => LoginPage,
+    _               => NotFound,
+}
+
+// === ENTRY POINT ===
+
+#[intent("Start the blog platform with content processing and blockchain integration")]
+fn main() {
+    let content_processor = spawn ContentProcessor();
+    let content_registry = deploy ContentRegistry();
+
+    print("Blog server starting on http://localhost:3000");
+    print("Content registry deployed at: {content_registry.address}");
+
+    BlogServer::start(content_processor, content_registry);
+}

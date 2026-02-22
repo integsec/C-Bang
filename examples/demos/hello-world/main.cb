@@ -1,0 +1,33 @@
+// Hello World — Your first C! program
+//
+// This demo shows the basics of C!:
+// - Entry point
+// - Intent annotations
+// - Type-safe printing
+
+#[intent("Print a greeting and demonstrate basic C! syntax")]
+fn main() {
+    // Variables with type inference
+    let name = "World";
+    let greeting = format("Hello, {name}!");
+
+    print(greeting);
+
+    // Refined types — value constraints checked at compile time
+    let port: u16{1..65535} = 8080;
+    print("Server would run on port {port}");
+
+    // Pattern matching
+    let result: Result<i32, String> = Ok(42);
+    match result {
+        Ok(value) => print("Got value: {value}"),
+        Err(msg)  => print("Error: {msg}"),
+    }
+
+    // Option type — no null!
+    let maybe_user: Option<String> = Some("Alice");
+    match maybe_user {
+        Some(user) => print("Found user: {user}"),
+        None       => print("No user found"),
+    }
+}

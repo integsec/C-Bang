@@ -1,0 +1,116 @@
+// Token Contract Demo — ERC20 token with C!'s security guarantees
+//
+// This contract demonstrates how C! eliminates common smart contract
+// vulnerabilities by construction:
+//
+// 1. REENTRANCY: Impossible — linear state prevents re-entry
+// 2. OVERFLOW:   Impossible — checked arithmetic by default
+// 3. DOUBLE-SPEND: Impossible — linear types prevent it
+// 4. FRONT-RUNNING: Mitigated — commit-reveal pattern built in
+
+contract DemoToken : ERC20 {
+    state name: String = "C! Demo Token"
+    state symbol: String = "CBANG"
+    state decimals: u8 = 18
+    state total_supply: u256
+    state balances: Map<Address, u256>
+    state allowances: Map<Address, Map<Address, u256>>
+
+    // INVARIANT: The compiler proves this holds after every state change
+    #[invariant(sum(balances.values()) == total_supply)]
+    #[invariant(forall a: Address => balances[a] <= total_supply)]
+
+    init(initial_supply: u256{1..MAX_U256}) {
+        total_supply = initial_supply * 10.pow(decimals);
+        balances[caller] = total_supply;
+        emit Transfer(Address::zero(), caller, total_supply);
+    }
+
+    // --- Core ERC20 ---
+
+    #[intent("Transfer tokens from caller to recipient.
+             Must have sufficient balance. Total supply unchanged.")]
+    #[pre(balances[caller] >= amount)]
+    #[post(balances[to] == old(balances[to]) + amount)]
+    #[post(balances[caller] == old(balances[caller]) - amount)]
+    pub fn transfer(to: Address, amount: u256) -> Result<bool> {
+        verify!(to != Address::zero(), "ERC20: transfer to zero address");
+        verify!(balances[caller] >= amount, "ERC20: insufficient balance");
+
+        balances[caller] -= amount;
+        balances[to] += amount;
+
+        emit Transfer(caller, to, amount);
+        Ok(true)
+    }
+
+    #[intent("Approve spender to transfer tokens on caller's behalf")]
+    pub fn approve(spender: Address, amount: u256) -> Result<bool> {
+        verify!(spender != Address::zero(), "ERC20: approve to zero address");
+        allowances[caller][spender] = amount;
+        emit Approval(caller, spender, amount);
+        Ok(true)
+    }
+
+    #[intent("Transfer tokens on behalf of owner, using allowance")]
+    pub fn transfer_from(from: Address, to: Address, amount: u256) -> Result<bool> {
+        verify!(to != Address::zero(), "ERC20: transfer to zero address");
+        verify!(balances[from] >= amount, "ERC20: insufficient balance");
+        verify!(allowances[from][caller] >= amount, "ERC20: insufficient allowance");
+
+        balances[from] -= amount;
+        balances[to] += amount;
+        allowances[from][caller] -= amount;
+
+        emit Transfer(from, to, amount);
+        Ok(true)
+    }
+
+    // --- Views (pure — compiler enforces no state mutation) ---
+
+    pub pure fn balance_of(account: Address) -> u256 {
+        balances[account]
+    }
+
+    pub pure fn allowance(owner: Address, spender: Address) -> u256 {
+        allowances[owner][spender]
+    }
+
+    pub pure fn total_supply() -> u256 {
+        total_supply
+    }
+
+    // --- Extended features ---
+
+    #[intent("Mint new tokens to an address. Only callable by contract owner.")]
+    #[auth(owner)]
+    pub fn mint(to: Address, amount: u256) -> Result<()> {
+        verify!(to != Address::zero(), "ERC20: mint to zero address");
+
+        total_supply += amount;
+        balances[to] += amount;
+
+        emit Transfer(Address::zero(), to, amount);
+        Ok(())
+    }
+
+    #[intent("Burn tokens from caller's balance, reducing total supply")]
+    pub fn burn(amount: u256) -> Result<()> {
+        verify!(balances[caller] >= amount, "ERC20: burn exceeds balance");
+
+        balances[caller] -= amount;
+        total_supply -= amount;
+
+        emit Transfer(caller, Address::zero(), amount);
+        Ok(())
+    }
+}
+
+// --- Deployment script ---
+
+#[intent("Deploy the DemoToken contract with 1 million initial supply")]
+fn main() {
+    let token = deploy DemoToken(initial_supply: 1_000_000);
+    print("DemoToken deployed at: {token.address}");
+    print("Total supply: {token.total_supply()} CBANG");
+}
