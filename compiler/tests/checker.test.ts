@@ -338,6 +338,91 @@ describe('Checker', () => {
     });
   });
 
+  describe('type inference — literal narrowing', () => {
+    it('narrows integer literal to u16', () => {
+      expect(check('fn main() { let x: u16 = 42; }')).toEqual([]);
+    });
+
+    it('narrows integer literal to i32', () => {
+      expect(check('fn main() { let x: i32 = 100; }')).toEqual([]);
+    });
+
+    it('narrows integer literal to u8', () => {
+      expect(check('fn main() { let x: u8 = 255; }')).toEqual([]);
+    });
+
+    it('narrows integer literal to u256', () => {
+      expect(check('fn main() { let x: u256 = 42; }')).toEqual([]);
+    });
+
+    it('narrows float literal to f32', () => {
+      expect(check('fn main() { let x: f32 = 3.14; }')).toEqual([]);
+    });
+
+    it('narrows negative literal to i16', () => {
+      expect(check('fn main() { let x: i16 = -20; }')).toEqual([]);
+    });
+
+    it('narrows literal in function call argument', () => {
+      expect(check('fn foo(x: u16) {} fn main() { foo(80); }')).toEqual([]);
+    });
+
+    it('narrows literal in struct field', () => {
+      expect(check(`
+        type Point { x: i32, y: i32 }
+        fn main() { let p = Point { x: 1, y: 2 }; }
+      `)).toEqual([]);
+    });
+
+    it('narrows literal in return statement', () => {
+      expect(check('fn foo() -> u16 { return 42; }')).toEqual([]);
+    });
+
+    it('narrows literal in assignment', () => {
+      expect(check('fn main() { let mut x: u16 = 0; x = 100; }')).toEqual([]);
+    });
+
+    it('narrows through arithmetic expression', () => {
+      expect(check('fn main() { let x: i32 = 1 + 2; }')).toEqual([]);
+    });
+
+    it('narrows through negation', () => {
+      expect(check('fn main() { let x: i32 = -10; }')).toEqual([]);
+    });
+
+    it('does NOT narrow integer to bool', () => {
+      const d = check('fn main() { let x: bool = 42; }');
+      expect(d).toHaveLength(1);
+      expect(d[0]!.message).toContain('bool');
+    });
+
+    it('does NOT narrow integer to String', () => {
+      const d = check('fn main() { let x: String = 42; }');
+      expect(d).toHaveLength(1);
+    });
+
+    it('does NOT narrow variable types (only literals)', () => {
+      const d = check('fn main() { let a: i64 = 42; let b: u16 = a; }');
+      expect(d).toHaveLength(1);
+      expect(d[0]!.message).toContain('u16');
+      expect(d[0]!.message).toContain('i64');
+    });
+
+    it('narrows through type alias', () => {
+      expect(check(`
+        type Port = u16
+        fn main() { let p: Port = 8080; }
+      `)).toEqual([]);
+    });
+
+    it('narrows literal args to multiple different param types', () => {
+      expect(check(`
+        fn foo(a: u16, b: i32, c: u8) {}
+        fn main() { foo(80, 443, 255); }
+      `)).toEqual([]);
+    });
+  });
+
   describe('integration', () => {
     it('full pipeline: valid program with structs and functions', () => {
       const source = `

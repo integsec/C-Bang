@@ -24,7 +24,7 @@ import type { Span } from '../lexer/index.js';
 import type { Diagnostic } from '../errors/index.js';
 import { createError } from '../errors/index.js';
 import type { Type } from './types.js';
-import { NUMERIC_TYPES, typeEquals, typeToString } from './types.js';
+import { NUMERIC_TYPES, INTEGER_TYPES, FLOAT_TYPES, typeEquals, typeToString } from './types.js';
 import { Environment } from './environment.js';
 import { registerBuiltins } from './builtins.js';
 
@@ -194,10 +194,10 @@ export class Checker {
   // ─── Statement checkers ───────────────────────────────────────────
 
   private checkLetStmt(stmt: import('../ast/index.js').LetStmt): void {
-    const initType = this.inferExpr(stmt.initializer);
-
     if (stmt.typeAnnotation) {
       const annotType = this.resolveTypeExpr(stmt.typeAnnotation);
+      // Pass annotation type as context so literals can narrow
+      const initType = this.inferExpr(stmt.initializer, annotType);
       if (annotType.kind !== 'Unknown' && initType.kind !== 'Unknown'
         && !typeEquals(annotType, initType)) {
         this.error(
@@ -207,12 +207,15 @@ export class Checker {
       }
       this.env.define(stmt.name, annotType);
     } else {
+      const initType = this.inferExpr(stmt.initializer);
       this.env.define(stmt.name, initType);
     }
   }
 
   private checkReturnStmt(stmt: import('../ast/index.js').ReturnStmt): void {
-    const valType = stmt.value ? this.inferExpr(stmt.value) : { kind: 'Unit' } as Type;
+    const valType = stmt.value
+      ? this.inferExpr(stmt.value, this.currentReturnType)
+      : { kind: 'Unit' } as Type;
 
     if (this.currentReturnType.kind !== 'Unknown' && valType.kind !== 'Unknown'
       && !typeEquals(this.currentReturnType, valType)) {
@@ -259,7 +262,7 @@ export class Checker {
 
   private checkAssignStmt(stmt: import('../ast/index.js').AssignStmt): void {
     const targetType = this.inferExpr(stmt.target);
-    const valueType = this.inferExpr(stmt.value);
+    const valueType = this.inferExpr(stmt.value, targetType);
 
     if (stmt.operator === '+=' || stmt.operator === '-=') {
       if (targetType.kind === 'Primitive' && !NUMERIC_TYPES.has(targetType.name)) {
@@ -315,11 +318,19 @@ export class Checker {
 
   // ─── Expression inference ─────────────────────────────────────────
 
-  private inferExpr(expr: Expr): Type {
+  private inferExpr(expr: Expr, expectedType?: Type): Type {
     switch (expr.kind) {
       case 'IntLiteral':
+        // Contextual narrowing: integer literals adopt the expected integer type
+        if (expectedType?.kind === 'Primitive' && INTEGER_TYPES.has(expectedType.name)) {
+          return expectedType;
+        }
         return { kind: 'Primitive', name: 'i64' };
       case 'FloatLiteral':
+        // Contextual narrowing: float literals adopt the expected float type
+        if (expectedType?.kind === 'Primitive' && FLOAT_TYPES.has(expectedType.name)) {
+          return expectedType;
+        }
         return { kind: 'Primitive', name: 'f64' };
       case 'StringLiteral':
         return { kind: 'Primitive', name: 'String' };
@@ -328,9 +339,9 @@ export class Checker {
       case 'Ident':
         return this.inferIdent(expr);
       case 'Binary':
-        return this.inferBinary(expr);
+        return this.inferBinary(expr, expectedType);
       case 'Unary':
-        return this.inferUnary(expr);
+        return this.inferUnary(expr, expectedType);
       case 'Call':
         return this.inferCall(expr);
       case 'FieldAccess':
@@ -354,6 +365,9 @@ export class Checker {
       case 'Parallel':
       case 'Scope':
       case 'Range':
+      case 'ArrayLiteral':
+      case 'Closure':
+      case 'StringInterpolation':
         return { kind: 'Unknown' };
     }
   }
@@ -367,9 +381,11 @@ export class Checker {
     return t;
   }
 
-  private inferBinary(expr: import('../ast/index.js').BinaryExpr): Type {
-    const left = this.inferExpr(expr.left);
-    const right = this.inferExpr(expr.right);
+  private inferBinary(expr: import('../ast/index.js').BinaryExpr, expectedType?: Type): Type {
+    // For arithmetic, thread expected type so literals narrow (e.g., 1 + 2 as u16)
+    const numericCtx = ARITHMETIC_OPS.has(expr.operator) ? expectedType : undefined;
+    const left = this.inferExpr(expr.left, numericCtx);
+    const right = this.inferExpr(expr.right, numericCtx);
 
     if (COMPARISON_OPS.has(expr.operator)) {
       return { kind: 'Primitive', name: 'bool' };
@@ -411,8 +427,9 @@ export class Checker {
     return left.kind !== 'Unknown' ? left : right;
   }
 
-  private inferUnary(expr: import('../ast/index.js').UnaryExpr): Type {
-    const operandType = this.inferExpr(expr.operand);
+  private inferUnary(expr: import('../ast/index.js').UnaryExpr, expectedType?: Type): Type {
+    // For negation, thread expected type so -20 narrows to i16 if context demands
+    const operandType = this.inferExpr(expr.operand, expr.operator === '-' ? expectedType : undefined);
 
     if (expr.operator === '!') {
       const boolType: Type = { kind: 'Primitive', name: 'bool' };
@@ -462,16 +479,14 @@ export class Checker {
     }
 
     for (let i = 0; i < expr.args.length; i++) {
-      const argType = this.inferExpr(expr.args[i]!.value);
-      if (i < calleeType.params.length) {
-        const paramType = calleeType.params[i]!;
-        if (paramType.kind !== 'Unknown' && argType.kind !== 'Unknown'
-          && !typeEquals(paramType, argType)) {
-          this.error(
-            `Argument type mismatch: expected ${typeToString(paramType)}, got ${typeToString(argType)}`,
-            expr.args[i]!.span,
-          );
-        }
+      const paramType = i < calleeType.params.length ? calleeType.params[i]! : undefined;
+      const argType = this.inferExpr(expr.args[i]!.value, paramType);
+      if (paramType && paramType.kind !== 'Unknown' && argType.kind !== 'Unknown'
+        && !typeEquals(paramType, argType)) {
+        this.error(
+          `Argument type mismatch: expected ${typeToString(paramType)}, got ${typeToString(argType)}`,
+          expr.args[i]!.span,
+        );
       }
     }
 
@@ -534,7 +549,7 @@ export class Checker {
         this.inferExpr(f.value);
         continue;
       }
-      const valType = this.inferExpr(f.value);
+      const valType = this.inferExpr(f.value, fieldType);
       if (fieldType.kind !== 'Unknown' && valType.kind !== 'Unknown'
         && !typeEquals(fieldType, valType)) {
         this.error(

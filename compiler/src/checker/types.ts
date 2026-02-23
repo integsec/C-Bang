@@ -31,6 +31,8 @@ export const INTEGER_TYPES = new Set([
   'u8', 'u16', 'u32', 'u64', 'u128', 'u256',
 ]);
 
+export const FLOAT_TYPES = new Set(['f32', 'f64']);
+
 export function typeEquals(a: Type, b: Type): boolean {
   if (a.kind !== b.kind) return false;
   switch (a.kind) {
