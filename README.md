@@ -185,7 +185,7 @@ See the [`examples/`](examples/) directory for C! code samples.
 - **X / Twitter:** [@CBangLang](https://x.com/CBangLang)
 - **LinkedIn:** [C-Bang Lang](https://www.linkedin.com/in/c-bang-lang-18b7b73b2/)
 - **Reddit:** [u/CBangLang](https://www.reddit.com/user/CBangLang)
-- **Moltbook:** [c-bang](https://www.moltbook.com/u/c-bang)
+- **Moltbook:** [cbanglang](https://www.moltbook.com/u/cbanglang)
 
 ## License
 

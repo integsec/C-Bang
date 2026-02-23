@@ -21,7 +21,7 @@ import { execSync } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { Lexer, TokenType, Parser, formatDiagnostic, createError, VERSION } from './index.js';
 import { Resolver } from './semantic/index.js';
-import { Checker, OwnershipChecker, RefinementChecker, IntentChecker } from './checker/index.js';
+import { Checker, OwnershipChecker, RefinementChecker, IntentChecker, EffectChecker } from './checker/index.js';
 
 function main(): void {
   const args = process.argv.slice(2);
@@ -241,6 +241,24 @@ function checkCommand(filePath: string): void {
   }
 
   console.log(`✓ Intent verification passed`);
+
+  const effectChecker = new EffectChecker();
+  const effectDiags = effectChecker.check(program);
+
+  const effectErrors = effectDiags.filter(d => d.severity === 'error');
+  if (effectErrors.length > 0) {
+    for (const d of effectErrors) {
+      console.error(formatDiagnostic(d, source));
+    }
+    process.exit(1);
+  }
+
+  // Show warnings but don't fail
+  for (const d of effectDiags.filter(d => d.severity === 'warning')) {
+    console.error(formatDiagnostic(d, source));
+  }
+
+  console.log(`✓ Effect checking passed`);
 }
 
 async function compile(filePath: string): Promise<string> {
@@ -314,6 +332,17 @@ async function compile(filePath: string): Promise<string> {
   const intentErrors = intentDiags.filter(d => d.severity === 'error');
   if (intentErrors.length > 0) {
     for (const d of intentErrors) {
+      console.error(formatDiagnostic(d, source));
+    }
+    process.exit(1);
+  }
+
+  const effectChecker = new EffectChecker();
+  const effectDiags = effectChecker.check(program);
+
+  const effectErrors = effectDiags.filter(d => d.severity === 'error');
+  if (effectErrors.length > 0) {
+    for (const d of effectErrors) {
       console.error(formatDiagnostic(d, source));
     }
     process.exit(1);
