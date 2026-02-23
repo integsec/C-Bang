@@ -2,6 +2,8 @@
 
 Syntax highlighting, snippets, and language support for [C! (C-Bang)](https://c-bang.integsec.com), the programming language designed for AI-human collaboration with security by construction.
 
+![C! syntax highlighting in VS Code](screenshots/vscode_syntaxhighlighting.png)
+
 ## Features
 
 - **Syntax highlighting** for all C! constructs — actors, contracts, components, servers, functions, enums, and more
