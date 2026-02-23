@@ -7,6 +7,5 @@
     </linearGradient>
   </defs>
   <rect width="64" height="64" rx="14" fill="#0a0a0f"/>
-  <text x="32" y="48" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="800" font-size="42" text-anchor="end" fill="url(#g)">C</text>
-  <text x="32" y="48" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="800" font-size="42" text-anchor="start" fill="#22d3a0">!</text>
+  <text x="32" y="46" font-family="Inter, Segoe UI, system-ui, sans-serif" font-weight="800" font-size="40" text-anchor="middle" dominant-baseline="central" fill="url(#g)"><tspan fill="url(#g)">C</tspan><tspan fill="#22d3a0">!</tspan></text>
 </svg>
