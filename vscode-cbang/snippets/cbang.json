@@ -1,0 +1,246 @@
+{
+  "Function": {
+    "prefix": "fn",
+    "body": [
+      "fn ${1:name}(${2:}) -> ${3:Result<()>} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Function declaration"
+  },
+  "Public Function": {
+    "prefix": "pubfn",
+    "body": [
+      "pub fn ${1:name}(${2:}) -> ${3:Result<()>} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Public function declaration"
+  },
+  "Pure Function": {
+    "prefix": "purefn",
+    "body": [
+      "pure fn ${1:name}(${2:}) -> ${3} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Pure function declaration"
+  },
+  "Async Function": {
+    "prefix": "asyncfn",
+    "body": [
+      "async fn ${1:name}(${2:}) -> ${3:Result<()>} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Async function declaration"
+  },
+  "Actor": {
+    "prefix": "actor",
+    "body": [
+      "actor ${1:Name} {",
+      "\tstate {",
+      "\t\t${2:field}: ${3:type}",
+      "\t}",
+      "",
+      "\ton ${4:Message}(${5:}) {",
+      "\t\t$0",
+      "\t}",
+      "}"
+    ],
+    "description": "Actor declaration with state and message handler"
+  },
+  "Contract": {
+    "prefix": "contract",
+    "body": [
+      "contract ${1:Name} {",
+      "\tstate {",
+      "\t\t${2:field}: ${3:type}",
+      "\t}",
+      "",
+      "\tinit(${4:}) {",
+      "\t\t$0",
+      "\t}",
+      "}"
+    ],
+    "description": "Smart contract declaration"
+  },
+  "Server": {
+    "prefix": "server",
+    "body": [
+      "server ${1:Name} {",
+      "\tport: ${2:8080}",
+      "",
+      "\t#[get(\"${3:/}\")]",
+      "\tfn ${4:index}() -> Html {",
+      "\t\t$0",
+      "\t}",
+      "}"
+    ],
+    "description": "Server declaration with route"
+  },
+  "Component": {
+    "prefix": "component",
+    "body": [
+      "component ${1:Name}(${2:}) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "UI component declaration"
+  },
+  "Enum": {
+    "prefix": "enum",
+    "body": [
+      "enum ${1:Name} {",
+      "\t${2:Variant1},",
+      "\t${3:Variant2},",
+      "}"
+    ],
+    "description": "Enum declaration"
+  },
+  "Type Struct": {
+    "prefix": "type",
+    "body": [
+      "type ${1:Name} {",
+      "\t${2:field}: ${3:type},",
+      "}"
+    ],
+    "description": "Type/struct declaration"
+  },
+  "Let Binding": {
+    "prefix": "let",
+    "body": "let ${1:name} = ${2:value};",
+    "description": "Immutable variable binding"
+  },
+  "Let Mut Binding": {
+    "prefix": "letmut",
+    "body": "let mut ${1:name} = ${2:value};",
+    "description": "Mutable variable binding"
+  },
+  "If Statement": {
+    "prefix": "if",
+    "body": [
+      "if ${1:condition} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "If statement"
+  },
+  "If Else": {
+    "prefix": "ifelse",
+    "body": [
+      "if ${1:condition} {",
+      "\t$2",
+      "} else {",
+      "\t$0",
+      "}"
+    ],
+    "description": "If-else statement"
+  },
+  "Match": {
+    "prefix": "match",
+    "body": [
+      "match ${1:value} {",
+      "\t${2:Pattern} => ${3:expr},",
+      "\t_ => ${0:expr},",
+      "}"
+    ],
+    "description": "Match expression"
+  },
+  "For Loop": {
+    "prefix": "for",
+    "body": [
+      "for ${1:item} in ${2:collection} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "For-in loop"
+  },
+  "While Loop": {
+    "prefix": "while",
+    "body": [
+      "while ${1:condition} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "While loop"
+  },
+  "Intent Annotation": {
+    "prefix": "intent",
+    "body": "#[intent(\"${1:description}\")]",
+    "description": "Intent annotation"
+  },
+  "Pre Condition": {
+    "prefix": "pre",
+    "body": "#[pre(${1:condition})]",
+    "description": "Precondition annotation"
+  },
+  "Post Condition": {
+    "prefix": "post",
+    "body": "#[post(${1:condition})]",
+    "description": "Postcondition annotation"
+  },
+  "Invariant": {
+    "prefix": "invariant",
+    "body": "#[invariant(${1:condition})]",
+    "description": "Invariant annotation"
+  },
+  "Spawn Actor": {
+    "prefix": "spawn",
+    "body": "let ${1:actor} = spawn ${2:ActorName}(${3:});",
+    "description": "Spawn an actor"
+  },
+  "Supervise": {
+    "prefix": "supervise",
+    "body": [
+      "supervise {",
+      "\tchildren: [${1:}]",
+      "\trestart: .${2:always}",
+      "}"
+    ],
+    "description": "Supervision tree"
+  },
+  "Use Import": {
+    "prefix": "use",
+    "body": "use ${1:module}::${2:item};",
+    "description": "Use/import declaration"
+  },
+  "On Handler": {
+    "prefix": "on",
+    "body": [
+      "on ${1:Message}(${2:}) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Actor message handler"
+  },
+  "Verify": {
+    "prefix": "verify",
+    "body": "verify!(${1:condition}, \"${2:message}\");",
+    "description": "Verify assertion macro"
+  },
+  "Parallel Block": {
+    "prefix": "parallel",
+    "body": [
+      "parallel {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Parallel execution block"
+  },
+  "Deploy Contract": {
+    "prefix": "deploy",
+    "body": "let ${1:instance} = deploy ${2:ContractName}(${3:});",
+    "description": "Deploy a smart contract"
+  },
+  "Emit Event": {
+    "prefix": "emit",
+    "body": "emit ${1:Event}(${2:});",
+    "description": "Emit an event"
+  },
+  "Closure": {
+    "prefix": "closure",
+    "body": "|${1:params}| ${2:expr}",
+    "description": "Closure/lambda expression"
+  }
+}

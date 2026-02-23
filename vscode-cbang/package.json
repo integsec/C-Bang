@@ -1,15 +1,17 @@
 {
   "name": "cbang",
   "displayName": "C! (C-Bang)",
-  "description": "Syntax highlighting and language support for C! (C-Bang)",
-  "version": "0.1.0",
+  "description": "Syntax highlighting, snippets, and language support for C! (C-Bang)",
+  "version": "0.2.0",
   "publisher": "integsec",
   "license": "Apache-2.0",
+  "icon": "icon.svg",
   "engines": {
     "vscode": "^1.75.0"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Snippets"
   ],
   "repository": {
     "type": "git",
@@ -22,7 +24,8 @@
     "smart contracts",
     "linear types",
     "actor model",
-    "wasm"
+    "wasm",
+    "security"
   ],
   "contributes": {
     "languages": [
@@ -36,7 +39,11 @@
         "extensions": [
           ".cb"
         ],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icon.svg",
+          "dark": "./icon.svg"
+        }
       }
     ],
     "grammars": [
@@ -44,6 +51,50 @@
         "language": "cbang",
         "scopeName": "source.cbang",
         "path": "./syntaxes/cbang.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "cbang",
+        "path": "./snippets/cbang.json"
+      }
+    ],
+    "taskDefinitions": [
+      {
+        "type": "cbang",
+        "required": ["command"],
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "The cbang command to run (check, build, run, lex, parse)"
+          },
+          "file": {
+            "type": "string",
+            "description": "The .cb file to compile"
+          }
+        }
+      }
+    ],
+    "problemMatchers": [
+      {
+        "name": "cbang",
+        "owner": "cbang",
+        "fileLocation": ["relative", "${workspaceFolder}"],
+        "severity": "error",
+        "pattern": [
+          {
+            "regexp": "^(ERROR|WARN|INFO)\\[(.+)\\]:\\s+(.+)$",
+            "severity": 1,
+            "code": 2,
+            "message": 3
+          },
+          {
+            "regexp": "^\\s+-->\\s+(.+):(\\d+):(\\d+)$",
+            "file": 1,
+            "line": 2,
+            "column": 3
+          }
+        ]
       }
     ]
   }

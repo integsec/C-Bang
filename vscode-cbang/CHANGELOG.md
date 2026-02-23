@@ -1,10 +1,23 @@
 # Changelog
 
+## 0.2.0 — 2026-02-23
+
+### Added
+
+- 30+ code snippets for common C! patterns (functions, actors, contracts, servers, components, control flow, annotations)
+- Problem matcher for `cbang check` output — see errors inline in VS Code
+- Task definition for `cbang` commands
+- File icon for `.cb` files using the C! logo
+- `security` keyword tag
+
+### Changed
+
+- Bumped version to 0.2.0
+- Updated README with snippet table, problem matcher usage, and links
+
 ## 0.1.0 — 2026-02-22
 
-Initial release of the C! (C-Bang) VS Code extension.
-
-### Features
+### Added
 
 - Syntax highlighting for `.cb` files
 - Support for all C! language constructs:
