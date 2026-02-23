@@ -1,0 +1,92 @@
+// error_handling.cb — Result type, early returns, error propagation
+//
+// C! has no exceptions and no null. All fallible operations return
+// Result<T, E> or Option<T>. The ? operator enables concise error
+// propagation, and pattern matching ensures errors are always handled.
+
+// Custom error types as algebraic data types
+type DatabaseError =
+    | ConnectionFailed(String)
+    | QueryFailed(String)
+    | RecordNotFound(String)
+
+type ValidationError =
+    | FieldRequired(String)
+    | InvalidFormat(String, String)
+
+type AppError =
+    | DbError(DatabaseError)
+    | Validation(ValidationError)
+    | Unauthorized(String)
+
+// Validate fields, collecting all errors
+fn validate_user(name: String, email: String) -> Result<(), Vec<ValidationError>> {
+    let mut errors: Vec<ValidationError> = [];
+    if name.is_empty() {
+        errors.push(FieldRequired("name"));
+    }
+    if !email.contains("@") {
+        errors.push(InvalidFormat("email", "must contain @"));
+    }
+    if errors.is_empty() { Ok(()) } else { Err(errors) }
+}
+
+// The ? operator propagates errors up the call stack
+#[intent("Find a user by ID, propagating database errors to the caller")]
+fn find_user(id: u64) -> Result<User, AppError> with Database {
+    let row = db.query("SELECT * FROM users WHERE id = ?", [id])
+        .map_err(|e| DbError(QueryFailed(e.message)))?;
+    row.first()
+        .ok_or(DbError(RecordNotFound(format("User {id} not found"))))
+}
+
+// Match on errors for specific recovery strategies
+fn get_user_or_default(id: u64) -> User with Database {
+    match find_user(id) {
+        Ok(user) => user,
+        Err(DbError(RecordNotFound(_))) => {
+            User { id: 0, name: "Guest", email: "guest@example.com" }
+        }
+        Err(DbError(ConnectionFailed(msg))) => {
+            print("DB down: {msg}, using cache");
+            cache::get_user(id).unwrap_or(User { id: 0, name: "Offline", email: "" })
+        }
+        Err(_) => User { id: 0, name: "Error", email: "" },
+    }
+}
+
+// Option chaining — safely navigate nested optional values
+type Profile {
+    settings: Option<Settings>,
+}
+
+type Settings {
+    theme: Option<String>,
+}
+
+fn get_theme(profile: &Profile) -> String {
+    profile.settings
+        .and_then(|s| s.theme)
+        .unwrap_or("default")
+}
+
+#[intent("Demonstrate error handling: validation, propagation, and recovery")]
+fn main() with Database {
+    match validate_user("", "bad-email") {
+        Ok(()) => print("Valid"),
+        Err(errors) => {
+            for err in errors {
+                match err {
+                    FieldRequired(f)      => print("Missing: {f}"),
+                    InvalidFormat(f, msg)  => print("{f}: {msg}"),
+                }
+            }
+        }
+    }
+
+    let user = find_user(42)?;
+    print("Found: {user.name}");
+
+    let fallback = get_user_or_default(999);
+    print("Fallback: {fallback.name}");
+}

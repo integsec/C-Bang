@@ -1,0 +1,94 @@
+// closures.cb — Lambda expressions, capturing variables, higher-order functions
+//
+// C! supports closures that capture variables from their enclosing scope.
+// Closures respect ownership rules. Higher-order functions take or return
+// closures, enabling functional programming with full type safety.
+
+// Higher-order function: apply a transformation twice
+fn apply_twice<T>(value: T, f: fn(T) -> T) -> T {
+    f(f(value))
+}
+
+// Compose two functions into one
+fn compose<A, B, C>(f: fn(A) -> B, g: fn(B) -> C) -> fn(A) -> C {
+    |a| g(f(a))
+}
+
+// Closure factory: returns a closure capturing the argument
+fn make_adder(amount: i32) -> fn(i32) -> i32 {
+    |x| x + amount
+}
+
+fn make_multiplier(factor: f64) -> fn(f64) -> f64 {
+    |x| x * factor
+}
+
+// Pipeline: chain transformations in sequence
+fn pipeline<T>(value: T, steps: Vec<fn(T) -> T>) -> T {
+    let mut result = value;
+    for step in steps {
+        result = step(result);
+    }
+    result
+}
+
+// Retry logic using a closure for the operation
+fn retry<T, E>(max: u32, op: fn() -> Result<T, E>) -> Result<T, E>
+    where E: Display
+{
+    let mut last_err: Option<E> = None;
+    for attempt in 1..=max {
+        match op() {
+            Ok(v)  => return Ok(v),
+            Err(e) => {
+                print("Attempt {attempt}/{max} failed: {e}");
+                last_err = Some(e);
+            }
+        }
+    }
+    Err(last_err.unwrap())
+}
+
+// Sorting with a closure comparator
+type Employee { name: String, salary: f64 }
+
+fn sort_by<T>(items: &mut Vec<T>, compare: fn(&T, &T) -> Ordering) {
+    items.sort_by(compare);
+}
+
+#[intent("Demonstrate closures, capturing, and higher-order functions")]
+fn main() {
+    let square = |x: i32| x * x;
+    print("5 squared: {square(5)}");
+
+    // Closure capturing from enclosing scope
+    let greeting = "Hello";
+    let greet = |name: String| format("{greeting}, {name}!");
+    print(greet("Alice"));
+
+    // Higher-order functions
+    let double = |x: i32| x * 2;
+    print("Apply double twice to 3: {apply_twice(3, double)}");
+
+    // Composition
+    let add_one = |x: i32| x + 1;
+    let double_then_add = compose(double, add_one);
+    print("double(5) + 1 = {double_then_add(5)}");
+
+    // Closure factories
+    let add_ten = make_adder(10);
+    print("15 + 10 = {add_ten(15)}");
+
+    // Pipeline
+    let result = pipeline(10, [|x| x + 5, |x| x * 2, |x| x - 3]);
+    print("Pipeline: {result}");
+
+    // Sort employees by salary descending
+    let mut team = [
+        Employee { name: "Alice", salary: 120000.0 },
+        Employee { name: "Bob", salary: 95000.0 },
+        Employee { name: "Carol", salary: 135000.0 },
+    ];
+    sort_by(&mut team, |a, b| b.salary.compare(a.salary));
+    for emp in &team { print("{emp.name}: ${emp.salary}"); }
+}

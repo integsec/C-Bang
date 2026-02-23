@@ -44,3 +44,19 @@ jobs:
             echo "Lexing $file..."
             node dist/cli.js lex "$file"
           done
+
+      - name: Test parser against examples
+        working-directory: compiler
+        run: |
+          for file in ../examples/*.cb ../examples/demos/*/main.cb; do
+            echo "Parsing $file..."
+            node dist/cli.js parse "$file"
+          done
+
+      - name: Test type checker against examples
+        working-directory: compiler
+        run: |
+          for file in ../examples/*.cb ../examples/demos/*/main.cb; do
+            echo "Checking $file..."
+            node dist/cli.js check "$file"
+          done

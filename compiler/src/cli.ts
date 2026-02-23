@@ -14,9 +14,12 @@
  *   cbang --help              Show help
  */
 
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { Lexer, TokenType, Parser, formatDiagnostic, VERSION } from './index.js';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve, basename } from 'node:path';
+import { execSync } from 'node:child_process';
+import { createInterface } from 'node:readline';
+import { Lexer, TokenType, Parser, formatDiagnostic, createError, VERSION } from './index.js';
+import { Resolver } from './semantic/index.js';
 import { Checker } from './checker/index.js';
 
 function main(): void {
@@ -62,7 +65,27 @@ function main(): void {
       break;
 
     case 'run':
+      if (!file) {
+        console.error('Error: missing file argument');
+        console.error('Usage: cbang run <file.cb>');
+        process.exit(1);
+      }
+      runCommand(file).catch(handleError);
+      break;
+
     case 'build':
+      if (!file) {
+        console.error('Error: missing file argument');
+        console.error('Usage: cbang build <file.cb>');
+        process.exit(1);
+      }
+      buildCommand(file).catch(handleError);
+      break;
+
+    case 'repl':
+      replCommand();
+      break;
+
     case 'verify':
     case 'audit':
       console.log(`'cbang ${command}' is not yet implemented.`);
@@ -119,7 +142,8 @@ function checkCommand(filePath: string): void {
   const lexErrors = tokens.filter(t => t.type === TokenType.Error);
   if (lexErrors.length > 0) {
     for (const err of lexErrors) {
-      console.error(`Error at ${err.span.start.line}:${err.span.start.column}: unexpected character '${err.value}'`);
+      const diag = createError('L001', `Unexpected character '${err.value}'`, err.span);
+      console.error(formatDiagnostic(diag, source));
     }
     process.exit(1);
   }
@@ -138,6 +162,18 @@ function checkCommand(filePath: string): void {
 
   console.log(`✓ Parsing passed (${program.items.length} top-level items)`);
 
+  const resolver = new Resolver();
+  const nameDiags = resolver.resolve(program);
+
+  if (nameDiags.length > 0) {
+    for (const d of nameDiags) {
+      console.error(formatDiagnostic(d, source));
+    }
+    process.exit(1);
+  }
+
+  console.log(`✓ Name resolution passed`);
+
   const checker = new Checker();
   const typeDiags = checker.check(program);
 
@@ -149,6 +185,85 @@ function checkCommand(filePath: string): void {
   }
 
   console.log(`✓ Type checking passed`);
+}
+
+async function compile(filePath: string): Promise<string> {
+  const source = readSource(filePath);
+  const lexer = new Lexer(source, filePath);
+  const tokens = lexer.tokenize();
+
+  const lexErrors = tokens.filter(t => t.type === TokenType.Error);
+  if (lexErrors.length > 0) {
+    for (const err of lexErrors) {
+      const diag = createError('L001', `Unexpected character '${err.value}'`, err.span);
+      console.error(formatDiagnostic(diag, source));
+    }
+    process.exit(1);
+  }
+
+  const parser = new Parser(tokens);
+  const { program, diagnostics } = parser.parse();
+
+  if (diagnostics.length > 0) {
+    for (const d of diagnostics) {
+      console.error(formatDiagnostic(d, source));
+    }
+    process.exit(1);
+  }
+
+  const resolver = new Resolver();
+  const nameDiags = resolver.resolve(program);
+
+  if (nameDiags.length > 0) {
+    for (const d of nameDiags) {
+      console.error(formatDiagnostic(d, source));
+    }
+    process.exit(1);
+  }
+
+  const checker = new Checker();
+  const typeDiags = checker.check(program);
+
+  if (typeDiags.length > 0) {
+    for (const d of typeDiags) {
+      console.error(formatDiagnostic(d, source));
+    }
+    process.exit(1);
+  }
+
+  // Code generation
+  let genModule: any;
+  try {
+    genModule = await import('./codegen/index.js');
+  } catch {
+    console.error('Error: code generation is not yet available.');
+    console.error('The JavaScript code generator has not been built yet.');
+    process.exit(1);
+  }
+
+  const generator = new genModule.JsGenerator();
+  return generator.generate(program);
+}
+
+async function runCommand(filePath: string): Promise<void> {
+  const jsCode = await compile(filePath);
+  // Execute the generated JavaScript using Node.js
+  try {
+    execSync(`node -e ${JSON.stringify(jsCode)}`, {
+      stdio: 'inherit',
+      env: { ...process.env },
+    });
+  } catch (e: any) {
+    if (e.status) process.exit(e.status);
+    process.exit(1);
+  }
+}
+
+async function buildCommand(filePath: string): Promise<void> {
+  const jsCode = await compile(filePath);
+  const outFile = basename(filePath, '.cb') + '.js';
+  writeFileSync(outFile, jsCode, 'utf-8');
+  console.log(`✓ Compiled to ${outFile}`);
 }
 
 function readSource(filePath: string): string {
@@ -172,8 +287,9 @@ COMMANDS:
   check <file.cb>     Type-check a file
   lex <file.cb>       Show tokens (debug)
   parse <file.cb>     Show AST (debug)
-  run <file.cb>       Build and run      [not yet implemented]
-  build <file.cb>     Compile to target  [not yet implemented]
+  run <file.cb>       Compile and execute
+  build <file.cb>     Compile to JavaScript
+  repl                Interactive REPL
   verify <file.cb>    Formal verification [not yet implemented]
   audit <file.cb>     Security audit     [not yet implemented]
 
@@ -186,6 +302,135 @@ LEARN MORE:
   GitHub:   https://github.com/integsec/C-Bang
   Wiki:     https://github.com/integsec/C-Bang/wiki
 `.trim());
+}
+
+function replCommand(): void {
+  console.log(`cbang ${VERSION} — C! REPL`);
+  console.log('Type C! expressions or statements. Use :quit to exit.\n');
+
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    prompt: 'cbang> ',
+  });
+
+  rl.prompt();
+
+  rl.on('line', (line) => {
+    const input = line.trim();
+    if (input === ':quit' || input === ':q' || input === ':exit') {
+      rl.close();
+      return;
+    }
+
+    if (input === '') {
+      rl.prompt();
+      return;
+    }
+
+    if (input === ':help' || input === ':h') {
+      console.log('Commands:');
+      console.log('  :quit, :q     Exit the REPL');
+      console.log('  :lex <expr>   Show tokens for input');
+      console.log('  :ast <expr>   Show AST for input');
+      console.log('  :help, :h     Show this help');
+      console.log('');
+      rl.prompt();
+      return;
+    }
+
+    // :lex command — show tokens
+    if (input.startsWith(':lex ')) {
+      const src = input.slice(5);
+      const lexer = new Lexer(src, '<repl>');
+      const tokens = lexer.tokenize();
+      for (const t of tokens) {
+        if (t.type === TokenType.EOF) continue;
+        console.log(`  ${t.type.padEnd(20)} ${t.value}`);
+      }
+      rl.prompt();
+      return;
+    }
+
+    // :ast command — show AST
+    if (input.startsWith(':ast ')) {
+      const src = input.slice(5);
+      const lexer = new Lexer(src, '<repl>');
+      const tokens = lexer.tokenize();
+      const parser = new Parser(tokens);
+      const { program, diagnostics } = parser.parse();
+      if (diagnostics.length > 0) {
+        for (const d of diagnostics) {
+          console.error(formatDiagnostic(d, src));
+        }
+      } else {
+        console.log(JSON.stringify(program, null, 2));
+      }
+      rl.prompt();
+      return;
+    }
+
+    // Wrap input to make it parseable
+    // Try as expression first, then as top-level item
+    let src = input;
+    let wrappedAsExpr = false;
+
+    // If it doesn't look like a declaration, wrap in a function
+    if (!input.startsWith('fn ') && !input.startsWith('type ') &&
+        !input.startsWith('actor ') && !input.startsWith('enum ') &&
+        !input.startsWith('pub ') && !input.startsWith('use ') &&
+        !input.startsWith('contract ') && !input.startsWith('server ') &&
+        !input.startsWith('component ')) {
+      src = `fn __repl__() { ${input} }`;
+      wrappedAsExpr = true;
+    }
+
+    const lexer = new Lexer(src, '<repl>');
+    const tokens = lexer.tokenize();
+
+    const lexErrors = tokens.filter(t => t.type === TokenType.Error);
+    if (lexErrors.length > 0) {
+      for (const err of lexErrors) {
+        console.error(`  Error: unexpected '${err.value}'`);
+      }
+      rl.prompt();
+      return;
+    }
+
+    const parser = new Parser(tokens);
+    const { program, diagnostics } = parser.parse();
+
+    if (diagnostics.length > 0) {
+      for (const d of diagnostics) {
+        console.error(formatDiagnostic(d, src));
+      }
+    } else {
+      if (wrappedAsExpr) {
+        const fn = program.items[0] as any;
+        if (fn?.body?.statements) {
+          for (const stmt of fn.body.statements) {
+            console.log(`  ${stmt.kind}: ${JSON.stringify(stmt, null, 2).split('\n').slice(0, 5).join(' ')}`);
+          }
+        }
+      } else {
+        for (const item of program.items) {
+          console.log(`  ${item.kind}: ${item.kind === 'FunctionDecl' || item.kind === 'TypeDecl' || item.kind === 'ActorDecl' || item.kind === 'EnumDecl' ? (item as any).name : '...'}`);
+        }
+      }
+    }
+
+    rl.prompt();
+  });
+
+  rl.on('close', () => {
+    console.log('\nBye!');
+    process.exit(0);
+  });
+}
+
+function handleError(e: unknown): void {
+  console.error(e instanceof Error ? e.message : String(e));
+  process.exit(1);
 }
 
 main();

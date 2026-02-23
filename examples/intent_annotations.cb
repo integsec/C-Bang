@@ -1,0 +1,101 @@
+// intent_annotations.cb — @intent, @verify, @audit annotations
+//
+// C!'s AI-native design includes structured intent annotations that
+// serve as machine-readable specifications. The compiler verifies
+// implementation matches declared intent, pre/post conditions, and
+// invariants.
+
+// Pre/post conditions on a pure function
+#[intent("Calculate compound interest. Result is always >= principal.")]
+#[pre(principal > 0.0)]
+#[pre(rate >= 0.0)]
+#[post(result >= principal)]
+pure fn compound_interest(principal: f64, rate: f64, periods: u32) -> f64 {
+    principal * (1.0 + rate).pow(periods)
+}
+
+// Security-critical function with audit trail
+#[intent("Authenticate user by email and password.
+         Password is NEVER stored or logged in plaintext.
+         Rate-limited to 5 attempts per minute per IP.")]
+#[pre(googlesql_safe(email))]
+#[post(result.is_ok() implies valid_jwt(result.unwrap()))]
+#[audit("authentication", severity: "critical")]
+fn login(email: String, password: String, ip: String) -> Result<JwtToken, AuthError>
+    with Database, RateLimit
+{
+    rate_limit.check(ip, max: 5, window: .minute)?;
+    let user = db.find_by_email(email).ok_or(AuthError::InvalidCredentials)?;
+    let hash = crypto::hash(password);
+    if !crypto::timing_safe_eq(hash, user.password_hash) {
+        return Err(AuthError::InvalidCredentials);
+    }
+    Ok(jwt::sign(user.id, expires_in: .hours(24)))
+}
+
+// Formal financial guarantees
+#[intent("Transfer funds. Total balance must remain constant.")]
+#[pre(from_balance >= amount)]
+#[post(from_balance + to_balance == old(from_balance) + old(to_balance))]
+#[audit("financial", severity: "critical")]
+fn transfer_funds(from_balance: &mut u64, to_balance: &mut u64, amount: u64) -> Result<(), String> {
+    verify!(amount > 0, "Amount must be positive");
+    verify!(*from_balance >= amount, "Insufficient funds");
+    *from_balance -= amount;
+    *to_balance += amount;
+    Ok(())
+}
+
+// Verified contract with invariants
+#[verify]
+contract Escrow {
+    state buyer: Address
+    state seller: Address
+    state arbiter: Address
+    state amount: u256
+    state released: bool = false
+    state refunded: bool = false
+
+    #[invariant(!(released && refunded))]
+
+    init(seller_addr: Address, arbiter_addr: Address) {
+        buyer = caller;
+        seller = seller_addr;
+        arbiter = arbiter_addr;
+        amount = msg.value;
+    }
+
+    #[intent("Release escrowed funds to seller. Only buyer or arbiter may release.")]
+    #[pre(!released && !refunded)]
+    #[post(released == true)]
+    #[audit("escrow-release", severity: "critical")]
+    pub fn release() -> Result<()> {
+        verify!(caller == buyer || caller == arbiter, "Unauthorized");
+        released = true;
+        seller.transfer(amount);
+        emit FundsReleased(seller, amount);
+        Ok(())
+    }
+
+    #[intent("Refund escrowed funds to buyer. Only seller or arbiter may refund.")]
+    #[pre(!released && !refunded)]
+    #[post(refunded == true)]
+    pub fn refund() -> Result<()> {
+        verify!(caller == seller || caller == arbiter, "Unauthorized");
+        refunded = true;
+        buyer.transfer(amount);
+        emit FundsRefunded(buyer, amount);
+        Ok(())
+    }
+}
+
+#[intent("Demonstrate intent annotations, verification, and audit trails")]
+fn main() {
+    let interest = compound_interest(1000.0, 0.05, 12);
+    print("Compound interest: {interest}");
+
+    let mut alice: u64 = 1000;
+    let mut bob: u64 = 500;
+    transfer_funds(&mut alice, &mut bob, 250)?;
+    print("Alice: {alice}, Bob: {bob}");
+}

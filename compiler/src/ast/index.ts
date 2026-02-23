@@ -30,7 +30,8 @@ export type TopLevelItem =
   | ComponentDecl
   | UseDecl
   | ModDecl
-  | StateDecl;
+  | StateDecl
+  | EnumDecl;
 
 // ─── Annotations ───────────────────────────────────────────────────
 
@@ -206,6 +207,37 @@ export interface ModDecl extends BaseNode {
   body: TopLevelItem[] | null;
 }
 
+export interface EnumDecl extends BaseNode {
+  kind: 'EnumDecl';
+  name: string;
+  annotations: Annotation[];
+  visibility: Visibility;
+  typeParams: TypeParam[];
+  variants: EnumVariant[];
+}
+
+export type EnumVariant =
+  | UnitVariant
+  | TupleVariant
+  | StructVariant;
+
+export interface UnitVariant extends BaseNode {
+  kind: 'UnitVariant';
+  name: string;
+}
+
+export interface TupleVariant extends BaseNode {
+  kind: 'TupleVariant';
+  name: string;
+  fields: TypeExpr[];
+}
+
+export interface StructVariant extends BaseNode {
+  kind: 'StructVariant';
+  name: string;
+  fields: FieldDecl[];
+}
+
 // ─── Type Expressions ──────────────────────────────────────────────
 
 export type TypeExpr =
@@ -216,7 +248,8 @@ export type TypeExpr =
   | UnionType
   | ReferenceType
   | OwnType
-  | SharedType;
+  | SharedType
+  | ArrayType;
 
 export interface NamedType extends BaseNode {
   kind: 'NamedType';
@@ -270,6 +303,11 @@ export interface SharedType extends BaseNode {
   inner: TypeExpr;
 }
 
+export interface ArrayType extends BaseNode {
+  kind: 'ArrayType';
+  elementType: TypeExpr;
+}
+
 // ─── Statements ────────────────────────────────────────────────────
 
 export interface Block extends BaseNode {
@@ -284,6 +322,7 @@ export type Stmt =
   | ReplyStmt
   | EmitStmt
   | ForStmt
+  | WhileStmt
   | IfStmt
   | MatchStmt
   | AssignStmt
@@ -323,6 +362,12 @@ export interface ForStmt extends BaseNode {
   kind: 'ForStmt';
   variable: string;
   iterable: Expr;
+  body: Block;
+}
+
+export interface WhileStmt extends BaseNode {
+  kind: 'WhileStmt';
+  condition: Expr;
   body: Block;
 }
 
@@ -396,6 +441,7 @@ export type Expr =
   | IntLiteralExpr
   | FloatLiteralExpr
   | StringLiteralExpr
+  | StringInterpolationExpr
   | BoolLiteralExpr
   | IdentExpr
   | BinaryExpr
@@ -412,7 +458,9 @@ export type Expr =
   | ScopeExpr
   | MacroCallExpr
   | PathExpr
-  | RangeExpr;
+  | RangeExpr
+  | ArrayLiteralExpr
+  | ClosureExpr;
 
 export interface IntLiteralExpr extends BaseNode {
   kind: 'IntLiteral';
@@ -427,6 +475,15 @@ export interface FloatLiteralExpr extends BaseNode {
 export interface StringLiteralExpr extends BaseNode {
   kind: 'StringLiteral';
   value: string;
+}
+
+export type StringInterpolationPart =
+  | { kind: 'Literal'; value: string }
+  | { kind: 'Expr'; expr: Expr };
+
+export interface StringInterpolationExpr extends BaseNode {
+  kind: 'StringInterpolation';
+  parts: StringInterpolationPart[];
 }
 
 export interface BoolLiteralExpr extends BaseNode {
@@ -541,4 +598,22 @@ export interface RangeExpr extends BaseNode {
   start: Expr | null;
   end: Expr | null;
   inclusive: boolean;
+}
+
+export interface ArrayLiteralExpr extends BaseNode {
+  kind: 'ArrayLiteral';
+  elements: Expr[];
+}
+
+export interface ClosureExpr extends BaseNode {
+  kind: 'Closure';
+  params: ClosureParam[];
+  returnType: TypeExpr | null;
+  body: Expr | Block;
+}
+
+export interface ClosureParam extends BaseNode {
+  kind: 'ClosureParam';
+  name: string;
+  typeAnnotation: TypeExpr | null;
 }

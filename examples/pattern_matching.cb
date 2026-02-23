@@ -1,0 +1,77 @@
+// pattern_matching.cb — Match expressions with various patterns
+//
+// C! supports exhaustive pattern matching on algebraic data types.
+// The compiler ensures all cases are handled, eliminating unexpected
+// runtime failures from unmatched values.
+
+type Shape =
+    | Circle(f64)
+    | Rectangle(f64, f64)
+    | Triangle(f64, f64, f64)
+    | Point
+
+type HttpStatus =
+    | Ok
+    | NotFound
+    | ServerError(String)
+    | Redirect(String)
+
+// Pattern matching on enum variants with destructuring
+fn area(shape: &Shape) -> f64 {
+    match shape {
+        Circle(radius)    => 3.14159 * radius * radius,
+        Rectangle(w, h)   => w * h,
+        Triangle(a, b, c) => {
+            let s = (a + b + c) / 2.0;
+            (s * (s - a) * (s - b) * (s - c)).sqrt()
+        }
+        Point              => 0.0,
+    }
+}
+
+// Matching with guards and wildcards
+fn classify_temperature(temp: f64) -> String {
+    match temp {
+        t if t < 0.0   => "Below freezing",
+        0.0             => "Freezing point",
+        t if t < 20.0  => "Cool",
+        t if t < 35.0  => "Warm",
+        _               => "Hot",
+    }
+}
+
+// Nested pattern matching — matching inside Option and Result
+fn process_response(result: Result<Option<String>, HttpStatus>) -> String {
+    match result {
+        Ok(Some(data))        => format("Got data: {data}"),
+        Ok(None)              => "No data returned",
+        Err(NotFound)         => "Not found",
+        Err(ServerError(msg)) => format("Server failed: {msg}"),
+        Err(_)                => "Unknown error",
+    }
+}
+
+// If-let for single pattern matching — convenient for Options
+fn greet_user(name: Option<String>) {
+    if let Some(n) = name {
+        print("Hello, {n}!");
+    } else {
+        print("Hello, stranger!");
+    }
+}
+
+#[intent("Demonstrate pattern matching across various types and scenarios")]
+fn main() {
+    let shapes = [Circle(5.0), Rectangle(3.0, 4.0), Triangle(3.0, 4.0, 5.0), Point];
+    for shape in shapes {
+        print("Area: {area(&shape)}");
+    }
+
+    print(classify_temperature(22.5));
+
+    let response = Ok(Some("payload"));
+    print(process_response(response));
+
+    greet_user(Some("Alice"));
+    greet_user(None);
+}

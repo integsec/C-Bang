@@ -1295,6 +1295,358 @@ describe('Parser', () => {
     });
   });
 
+  describe('while loops', () => {
+    it('parses simple while loop', () => {
+      const { program, diagnostics } = parse(`
+        fn f() {
+          while running {
+            let x = 1;
+          }
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const fn_ = program.items[0] as any;
+      const stmt = fn_.body.statements[0];
+      expect(stmt.kind).toBe('WhileStmt');
+      expect(stmt.condition.kind).toBe('Ident');
+      expect(stmt.condition.name).toBe('running');
+      expect(stmt.body.statements).toHaveLength(1);
+    });
+
+    it('parses while loop with comparison condition', () => {
+      const { program, diagnostics } = parse(`
+        fn f() {
+          while count < 10 {
+            count += 1;
+          }
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const fn_ = program.items[0] as any;
+      const stmt = fn_.body.statements[0];
+      expect(stmt.kind).toBe('WhileStmt');
+      expect(stmt.condition.kind).toBe('Binary');
+      expect(stmt.condition.operator).toBe('<');
+    });
+
+    it('parses while loop with complex condition', () => {
+      const { program, diagnostics } = parse(`
+        fn f() {
+          while x > 0 && y < 100 {
+            x -= 1;
+            y += 1;
+          }
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const fn_ = program.items[0] as any;
+      const stmt = fn_.body.statements[0];
+      expect(stmt.kind).toBe('WhileStmt');
+      expect(stmt.condition.kind).toBe('Binary');
+      expect(stmt.condition.operator).toBe('&&');
+      expect(stmt.body.statements).toHaveLength(2);
+    });
+
+    it('parses while true loop', () => {
+      const { program, diagnostics } = parse(`
+        fn f() {
+          while true {
+            let x = process();
+          }
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const fn_ = program.items[0] as any;
+      const stmt = fn_.body.statements[0];
+      expect(stmt.kind).toBe('WhileStmt');
+      expect(stmt.condition.kind).toBe('BoolLiteral');
+      expect(stmt.condition.value).toBe(true);
+    });
+  });
+
+  describe('array literals', () => {
+    it('parses array literal with elements', () => {
+      const { program, diagnostics } = parse(`
+        fn f() {
+          let nums = [1, 2, 3];
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const fn_ = program.items[0] as any;
+      const init = fn_.body.statements[0].initializer;
+      expect(init.kind).toBe('ArrayLiteral');
+      expect(init.elements).toHaveLength(3);
+      expect(init.elements[0].kind).toBe('IntLiteral');
+      expect(init.elements[1].kind).toBe('IntLiteral');
+      expect(init.elements[2].kind).toBe('IntLiteral');
+    });
+
+    it('parses empty array literal', () => {
+      const { program, diagnostics } = parse(`
+        fn f() {
+          let empty = [];
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const fn_ = program.items[0] as any;
+      const init = fn_.body.statements[0].initializer;
+      expect(init.kind).toBe('ArrayLiteral');
+      expect(init.elements).toHaveLength(0);
+    });
+
+    it('parses array with trailing comma', () => {
+      const { program, diagnostics } = parse(`
+        fn f() {
+          let items = [1, 2, 3,];
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const fn_ = program.items[0] as any;
+      const init = fn_.body.statements[0].initializer;
+      expect(init.kind).toBe('ArrayLiteral');
+      expect(init.elements).toHaveLength(3);
+    });
+
+    it('parses array with expressions', () => {
+      const { program, diagnostics } = parse(`
+        fn f() {
+          let vals = [a + b, f(x), "hello"];
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const fn_ = program.items[0] as any;
+      const init = fn_.body.statements[0].initializer;
+      expect(init.kind).toBe('ArrayLiteral');
+      expect(init.elements).toHaveLength(3);
+      expect(init.elements[0].kind).toBe('Binary');
+      expect(init.elements[1].kind).toBe('Call');
+      expect(init.elements[2].kind).toBe('StringLiteral');
+    });
+
+    it('parses array type annotation', () => {
+      const { program, diagnostics } = parse(`
+        fn f(nums: [i32]) {
+          let x = 1;
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const fn_ = program.items[0] as any;
+      const type_ = fn_.params[0].typeAnnotation;
+      expect(type_.kind).toBe('ArrayType');
+      expect(type_.elementType.kind).toBe('NamedType');
+      expect(type_.elementType.name).toBe('i32');
+    });
+
+    it('parses let with array type annotation', () => {
+      const { program, diagnostics } = parse(`
+        fn f() {
+          let names: [String] = [];
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const fn_ = program.items[0] as any;
+      const stmt = fn_.body.statements[0];
+      expect(stmt.typeAnnotation.kind).toBe('ArrayType');
+      expect(stmt.typeAnnotation.elementType.name).toBe('String');
+      expect(stmt.initializer.kind).toBe('ArrayLiteral');
+    });
+  });
+
+  describe('enum declarations', () => {
+    it('parses simple enum with unit variants', () => {
+      const { program, diagnostics } = parse(`
+        enum Color {
+          Red,
+          Green,
+          Blue,
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      expect(program.items).toHaveLength(1);
+      const decl = program.items[0] as any;
+      expect(decl.kind).toBe('EnumDecl');
+      expect(decl.name).toBe('Color');
+      expect(decl.variants).toHaveLength(3);
+      expect(decl.variants[0].kind).toBe('UnitVariant');
+      expect(decl.variants[0].name).toBe('Red');
+      expect(decl.variants[1].name).toBe('Green');
+      expect(decl.variants[2].name).toBe('Blue');
+    });
+
+    it('parses enum with tuple variants', () => {
+      const { program, diagnostics } = parse(`
+        enum Shape {
+          Circle(f64),
+          Rectangle(f64, f64),
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const decl = program.items[0] as any;
+      expect(decl.kind).toBe('EnumDecl');
+      expect(decl.name).toBe('Shape');
+      expect(decl.variants).toHaveLength(2);
+      expect(decl.variants[0].kind).toBe('TupleVariant');
+      expect(decl.variants[0].name).toBe('Circle');
+      expect(decl.variants[0].fields).toHaveLength(1);
+      expect(decl.variants[1].kind).toBe('TupleVariant');
+      expect(decl.variants[1].name).toBe('Rectangle');
+      expect(decl.variants[1].fields).toHaveLength(2);
+    });
+
+    it('parses enum with struct variant', () => {
+      const { program, diagnostics } = parse(`
+        enum Shape {
+          Named { x: f64, y: f64 },
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const decl = program.items[0] as any;
+      expect(decl.variants).toHaveLength(1);
+      expect(decl.variants[0].kind).toBe('StructVariant');
+      expect(decl.variants[0].name).toBe('Named');
+      expect(decl.variants[0].fields).toHaveLength(2);
+      expect(decl.variants[0].fields[0].name).toBe('x');
+      expect(decl.variants[0].fields[1].name).toBe('y');
+    });
+
+    it('parses enum with mixed variant kinds', () => {
+      const { program, diagnostics } = parse(`
+        enum Shape {
+          Circle(f64),
+          Rectangle(f64, f64),
+          Named { x: f64, y: f64 },
+          Point,
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const decl = program.items[0] as any;
+      expect(decl.variants).toHaveLength(4);
+      expect(decl.variants[0].kind).toBe('TupleVariant');
+      expect(decl.variants[1].kind).toBe('TupleVariant');
+      expect(decl.variants[2].kind).toBe('StructVariant');
+      expect(decl.variants[3].kind).toBe('UnitVariant');
+    });
+
+    it('parses pub enum', () => {
+      const { program, diagnostics } = parse(`
+        pub enum Direction {
+          North,
+          South,
+          East,
+          West,
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const decl = program.items[0] as any;
+      expect(decl.kind).toBe('EnumDecl');
+      expect(decl.visibility).toBe('public');
+      expect(decl.variants).toHaveLength(4);
+    });
+
+    it('parses generic enum', () => {
+      const { program, diagnostics } = parse(`
+        enum Option<T> {
+          Some(T),
+          None,
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const decl = program.items[0] as any;
+      expect(decl.kind).toBe('EnumDecl');
+      expect(decl.name).toBe('Option');
+      expect(decl.typeParams).toHaveLength(1);
+      expect(decl.typeParams[0].name).toBe('T');
+      expect(decl.variants).toHaveLength(2);
+      expect(decl.variants[0].kind).toBe('TupleVariant');
+      expect(decl.variants[1].kind).toBe('UnitVariant');
+    });
+
+    it('parses enum with annotation', () => {
+      const { program, diagnostics } = parse(`
+        #[derive(Debug)]
+        enum Status {
+          Active,
+          Inactive,
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const decl = program.items[0] as any;
+      expect(decl.kind).toBe('EnumDecl');
+      expect(decl.annotations).toHaveLength(1);
+      expect(decl.annotations[0].name).toBe('derive');
+    });
+  });
+
+  describe('closure expressions', () => {
+    it('parses closure with typed params and block body', () => {
+      const { program, diagnostics } = parse(`
+        fn f() {
+          let add = |x: i32, y: i32| -> i32 { x + y };
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const fn_ = program.items[0] as any;
+      const init = fn_.body.statements[0].initializer;
+      expect(init.kind).toBe('Closure');
+      expect(init.params).toHaveLength(2);
+      expect(init.params[0].name).toBe('x');
+      expect(init.params[0].typeAnnotation).not.toBeNull();
+      expect(init.params[0].typeAnnotation.name).toBe('i32');
+      expect(init.params[1].name).toBe('y');
+      expect(init.returnType).not.toBeNull();
+      expect(init.returnType.name).toBe('i32');
+      expect(init.body.kind).toBe('Block');
+    });
+
+    it('parses closure with expression body', () => {
+      const { program, diagnostics } = parse(`
+        fn f() {
+          let double = |x| x * 2;
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const fn_ = program.items[0] as any;
+      const init = fn_.body.statements[0].initializer;
+      expect(init.kind).toBe('Closure');
+      expect(init.params).toHaveLength(1);
+      expect(init.params[0].name).toBe('x');
+      expect(init.params[0].typeAnnotation).toBeNull();
+      expect(init.returnType).toBeNull();
+      expect(init.body.kind).toBe('Binary');
+      expect(init.body.operator).toBe('*');
+    });
+
+    it('parses closure with no params', () => {
+      const { program, diagnostics } = parse(`
+        fn f() {
+          let greet = || "hello";
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const fn_ = program.items[0] as any;
+      const init = fn_.body.statements[0].initializer;
+      expect(init.kind).toBe('Closure');
+      expect(init.params).toHaveLength(0);
+      expect(init.body.kind).toBe('StringLiteral');
+    });
+
+    it('parses closure passed as function argument', () => {
+      const { program, diagnostics } = parse(`
+        fn f() {
+          let result = map(|x: i32| x + 1);
+        }
+      `);
+      expect(diagnostics).toHaveLength(0);
+      const fn_ = program.items[0] as any;
+      const call = fn_.body.statements[0].initializer;
+      expect(call.kind).toBe('Call');
+      const closureArg = call.args[0].value;
+      expect(closureArg.kind).toBe('Closure');
+      expect(closureArg.params).toHaveLength(1);
+      expect(closureArg.params[0].name).toBe('x');
+    });
+  });
+
   describe('error recovery', () => {
     it('recovers from errors and continues parsing', () => {
       const { program, diagnostics } = parse(`
@@ -1321,6 +1673,79 @@ describe('Parser', () => {
         42
       `);
       expect(diagnostics.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('string interpolation', () => {
+    it('parses simple interpolation', () => {
+      const { program } = parse(`
+        fn greet(name: string) {
+          let msg = "hello {name}!"
+        }
+      `);
+      const fn = program.items[0] as any;
+      const letStmt = fn.body.statements[0] as any;
+      expect(letStmt.initializer.kind).toBe('StringInterpolation');
+      expect(letStmt.initializer.parts).toHaveLength(3);
+      expect(letStmt.initializer.parts[0].kind).toBe('Literal');
+      expect(letStmt.initializer.parts[0].value).toBe('hello ');
+      expect(letStmt.initializer.parts[1].kind).toBe('Expr');
+      expect(letStmt.initializer.parts[1].expr.kind).toBe('Ident');
+      expect(letStmt.initializer.parts[1].expr.name).toBe('name');
+      expect(letStmt.initializer.parts[2].kind).toBe('Literal');
+      expect(letStmt.initializer.parts[2].value).toBe('!');
+    });
+
+    it('parses interpolation with expression', () => {
+      const { program } = parse(`
+        fn calc() {
+          let msg = "result: {x + 1}"
+        }
+      `);
+      const fn = program.items[0] as any;
+      const letStmt = fn.body.statements[0] as any;
+      expect(letStmt.initializer.kind).toBe('StringInterpolation');
+      const exprPart = letStmt.initializer.parts.find((p: any) => p.kind === 'Expr');
+      expect(exprPart.expr.kind).toBe('Binary');
+      expect(exprPart.expr.operator).toBe('+');
+    });
+
+    it('parses multiple interpolations', () => {
+      const { program } = parse(`
+        fn multi() {
+          let msg = "{a} and {b}"
+        }
+      `);
+      const fn = program.items[0] as any;
+      const letStmt = fn.body.statements[0] as any;
+      const interp = letStmt.initializer;
+      expect(interp.kind).toBe('StringInterpolation');
+      // parts: "" (empty), Expr(a), " and ", Expr(b), "" (empty)
+      const exprParts = interp.parts.filter((p: any) => p.kind === 'Expr');
+      expect(exprParts).toHaveLength(2);
+    });
+
+    it('parses method call in interpolation', () => {
+      const { program } = parse(`
+        fn show() {
+          let msg = "count: {items.len()}"
+        }
+      `);
+      const fn = program.items[0] as any;
+      const letStmt = fn.body.statements[0] as any;
+      const exprPart = letStmt.initializer.parts.find((p: any) => p.kind === 'Expr');
+      expect(exprPart.expr.kind).toBe('MethodCall');
+    });
+
+    it('plain strings still parse as StringLiteral', () => {
+      const { program } = parse(`
+        fn plain() {
+          let msg = "no interpolation here"
+        }
+      `);
+      const fn = program.items[0] as any;
+      const letStmt = fn.body.statements[0] as any;
+      expect(letStmt.initializer.kind).toBe('StringLiteral');
     });
   });
 });

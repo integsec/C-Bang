@@ -252,9 +252,9 @@ describe('Lexer', () => {
       expect(tokenValues('"path\\\\to\\\\file"')[0]).toBe('path\\to\\file');
     });
 
-    it('lexes string with unrecognized escape as literal', () => {
-      // \0 is not a recognized escape, so lexer preserves it as \0
-      expect(tokenValues('"null\\0byte"')[0]).toBe('null\\0byte');
+    it('lexes string with null byte escape', () => {
+      // \0 is a recognized escape representing a null byte (character code 0)
+      expect(tokenValues('"null\\0byte"')[0]).toBe('null\0byte');
     });
   });
 
@@ -313,12 +313,11 @@ describe('Lexer', () => {
       expect(tokens[0]!.type).toBe(TokenType.Error);
     });
 
-    it('handles unterminated block comment as comment token', () => {
-      // Lexer treats unterminated block comments as Comment, not Error
+    it('reports unterminated block comment as error token', () => {
       const tokens = lex('/* unterminated');
-      const comments = tokens.filter(t => t.type === TokenType.Comment);
-      expect(comments.length).toBe(1);
-      expect(comments[0]!.value).toContain('unterminated');
+      const errors = tokens.filter(t => t.type === TokenType.Error);
+      expect(errors.length).toBe(1);
+      expect(errors[0]!.value).toBe('unterminated block comment');
     });
   });
 
@@ -421,6 +420,190 @@ fn transfer(from: Address, to: Address, amount: u256) -> Result<Receipt> {}`;
       const tokens = lex(source);
       const errors = tokens.filter(t => t.type === TokenType.Error);
       expect(errors).toHaveLength(0);
+    });
+  });
+
+  describe('unterminated block comments (#33)', () => {
+    it('produces error for unterminated block comment', () => {
+      const tokens = lex('/* this comment never ends');
+      const errors = tokens.filter(t => t.type === TokenType.Error);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]!.value).toBe('unterminated block comment');
+    });
+
+    it('produces error for nested block comment that is still open', () => {
+      // The lexer supports nested block comments (depth tracking).
+      // Here the inner comment is closed but the outer one is not.
+      const tokens = lex('/* nested /* comment */ still open');
+      const errors = tokens.filter(t => t.type === TokenType.Error);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]!.value).toBe('unterminated block comment');
+    });
+
+    it('still lexes valid block comments correctly', () => {
+      const tokens = lex('foo /* valid comment */ bar');
+      const nonComment = tokens.filter(t =>
+        t.type !== TokenType.Comment && t.type !== TokenType.EOF,
+      );
+      expect(nonComment.map(t => t.value)).toEqual(['foo', 'bar']);
+      const comments = tokens.filter(t => t.type === TokenType.Comment);
+      expect(comments).toHaveLength(1);
+      expect(comments[0]!.value).toBe('/* valid comment */');
+    });
+
+    it('still lexes valid nested block comments correctly', () => {
+      const tokens = lex('a /* outer /* inner */ end */ b');
+      const nonComment = tokens.filter(t =>
+        t.type !== TokenType.Comment && t.type !== TokenType.EOF,
+      );
+      expect(nonComment.map(t => t.value)).toEqual(['a', 'b']);
+      const errors = tokens.filter(t => t.type === TokenType.Error);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('produces error when code follows unterminated block comment', () => {
+      // Everything after /* is consumed into the unterminated comment
+      const tokens = lex('foo /* never closed\nbar baz');
+      const errors = tokens.filter(t => t.type === TokenType.Error);
+      expect(errors).toHaveLength(1);
+      // foo should still be lexed before the comment starts
+      const ids = tokens.filter(t => t.type === TokenType.Identifier);
+      expect(ids.map(t => t.value)).toEqual(['foo']);
+    });
+  });
+
+  describe('null byte escape in strings (#32)', () => {
+    it('handles \\0 escape as null byte in strings', () => {
+      const tokens = lex('"hello\\0world"');
+      expect(tokens[0]!.type).toBe(TokenType.StringLiteral);
+      expect(tokens[0]!.value).toBe('hello\0world');
+      expect(tokens[0]!.value.charCodeAt(5)).toBe(0);
+    });
+
+    it('handles string containing only null byte', () => {
+      const tokens = lex('"\\0"');
+      expect(tokens[0]!.type).toBe(TokenType.StringLiteral);
+      expect(tokens[0]!.value).toBe('\0');
+      expect(tokens[0]!.value.length).toBe(1);
+      expect(tokens[0]!.value.charCodeAt(0)).toBe(0);
+    });
+
+    it('handles null byte alongside other escapes', () => {
+      const tokens = lex('"\\n\\0\\t"');
+      expect(tokens[0]!.type).toBe(TokenType.StringLiteral);
+      expect(tokens[0]!.value).toBe('\n\0\t');
+    });
+
+    it('still handles \\n escape correctly', () => {
+      expect(tokenValues('"line\\nbreak"')[0]).toBe('line\nbreak');
+    });
+
+    it('still handles \\t escape correctly', () => {
+      expect(tokenValues('"tab\\there"')[0]).toBe('tab\there');
+    });
+
+    it('still handles \\\\ escape correctly', () => {
+      expect(tokenValues('"back\\\\slash"')[0]).toBe('back\\slash');
+    });
+
+    it('still handles \\" escape correctly', () => {
+      expect(tokenValues('"say\\"hello\\""')[0]).toBe('say"hello"');
+    });
+  });
+
+  describe('string interpolation', () => {
+    it('lexes simple interpolation "hello {name}"', () => {
+      const types = tokenTypes('"hello {name}"');
+      expect(types).toEqual([
+        TokenType.StringStart,
+        TokenType.Identifier,
+        TokenType.StringEnd,
+      ]);
+    });
+
+    it('StringStart contains text before interpolation', () => {
+      const tokens = lex('"hello {name}"');
+      expect(tokens[0]!.type).toBe(TokenType.StringStart);
+      expect(tokens[0]!.value).toBe('hello ');
+    });
+
+    it('StringEnd contains text after interpolation', () => {
+      const tokens = lex('"hello {name}!"');
+      const end = tokens.find(t => t.type === TokenType.StringEnd);
+      expect(end).toBeDefined();
+      expect(end!.value).toBe('!');
+    });
+
+    it('handles multiple interpolations', () => {
+      const types = tokenTypes('"{a} and {b}"');
+      expect(types).toEqual([
+        TokenType.StringStart,    // "" (empty before first)
+        TokenType.Identifier,     // a
+        TokenType.StringMiddle,   // " and "
+        TokenType.Identifier,     // b
+        TokenType.StringEnd,      // "" (empty after last)
+      ]);
+    });
+
+    it('StringMiddle contains text between interpolations', () => {
+      const tokens = lex('"{a} plus {b}"');
+      const mid = tokens.find(t => t.type === TokenType.StringMiddle);
+      expect(mid).toBeDefined();
+      expect(mid!.value).toBe(' plus ');
+    });
+
+    it('handles expression interpolation', () => {
+      const types = tokenTypes('"{x + 1}"');
+      expect(types).toEqual([
+        TokenType.StringStart,
+        TokenType.Identifier,
+        TokenType.Plus,
+        TokenType.IntLiteral,
+        TokenType.StringEnd,
+      ]);
+    });
+
+    it('handles nested braces in interpolation', () => {
+      // Expression with struct literal inside interpolation
+      const types = tokenTypes('"result: {foo()}"');
+      expect(types).toEqual([
+        TokenType.StringStart,    // "result: "
+        TokenType.Identifier,     // foo
+        TokenType.LeftParen,
+        TokenType.RightParen,
+        TokenType.StringEnd,      // ""
+      ]);
+    });
+
+    it('escaped brace produces literal brace, not interpolation', () => {
+      const types = tokenTypes('"\\{not interpolation\\}"');
+      expect(types).toEqual([TokenType.StringLiteral]);
+      expect(tokenValues('"\\{not interpolation\\}"')[0]).toBe('{not interpolation}');
+    });
+
+    it('handles empty interpolation expression', () => {
+      // Edge case: "{}" — empty string start, then immediately StringEnd
+      const types = tokenTypes('"{}"');
+      expect(types[0]).toBe(TokenType.StringStart);
+      // The RightBrace triggers continuation, producing StringEnd
+    });
+
+    it('plain string without interpolation stays as StringLiteral', () => {
+      const types = tokenTypes('"just a string"');
+      expect(types).toEqual([TokenType.StringLiteral]);
+    });
+
+    it('handles interpolation at start of string', () => {
+      const tokens = lex('"{name} said hi"');
+      expect(tokens[0]!.type).toBe(TokenType.StringStart);
+      expect(tokens[0]!.value).toBe(''); // empty before interpolation
+    });
+
+    it('handles interpolation at end of string', () => {
+      const tokens = lex('"value is {x}"');
+      const end = tokens.find(t => t.type === TokenType.StringEnd);
+      expect(end).toBeDefined();
+      expect(end!.value).toBe(''); // empty after interpolation
     });
   });
 });

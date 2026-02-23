@@ -1,0 +1,622 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "C! (C-Bang)",
+  "scopeName": "source.cbang",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#attributes" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#keywords" },
+    { "include": "#types" },
+    { "include": "#function-definition" },
+    { "include": "#type-definition" },
+    { "include": "#struct-definition" },
+    { "include": "#actor-definition" },
+    { "include": "#enum-definition" },
+    { "include": "#contract-definition" },
+    { "include": "#server-definition" },
+    { "include": "#component-definition" },
+    { "include": "#constants" },
+    { "include": "#function-call" },
+    { "include": "#macro-call" },
+    { "include": "#operators" },
+    { "include": "#punctuation" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.cbang",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.cbang",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "patterns": [
+            { "include": "#comments" }
+          ]
+        }
+      ]
+    },
+    "attributes": {
+      "patterns": [
+        {
+          "comment": "Intent annotation: #[intent(...)]",
+          "name": "meta.attribute.intent.cbang",
+          "begin": "(#\\[)(intent)(\\()",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.attribute.cbang" },
+            "2": { "name": "entity.name.function.attribute.intent.cbang" },
+            "3": { "name": "punctuation.section.arguments.begin.cbang" }
+          },
+          "end": "(\\))(\\])",
+          "endCaptures": {
+            "1": { "name": "punctuation.section.arguments.end.cbang" },
+            "2": { "name": "punctuation.definition.attribute.cbang" }
+          },
+          "patterns": [
+            { "include": "#strings" }
+          ]
+        },
+        {
+          "comment": "Verify annotation: #[verify(...)]",
+          "name": "meta.attribute.verify.cbang",
+          "begin": "(#\\[)(verify)(\\()",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.attribute.cbang" },
+            "2": { "name": "entity.name.function.attribute.verify.cbang" },
+            "3": { "name": "punctuation.section.arguments.begin.cbang" }
+          },
+          "end": "(\\))(\\])",
+          "endCaptures": {
+            "1": { "name": "punctuation.section.arguments.end.cbang" },
+            "2": { "name": "punctuation.definition.attribute.cbang" }
+          },
+          "patterns": [
+            { "include": "#strings" },
+            { "include": "#keywords" },
+            { "include": "#numbers" }
+          ]
+        },
+        {
+          "comment": "Pre/post conditions: #[pre(...)], #[post(...)]",
+          "name": "meta.attribute.condition.cbang",
+          "begin": "(#\\[)(pre|post)(\\()",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.attribute.cbang" },
+            "2": { "name": "entity.name.function.attribute.condition.cbang" },
+            "3": { "name": "punctuation.section.arguments.begin.cbang" }
+          },
+          "end": "(\\))(\\])",
+          "endCaptures": {
+            "1": { "name": "punctuation.section.arguments.end.cbang" },
+            "2": { "name": "punctuation.definition.attribute.cbang" }
+          },
+          "patterns": [
+            { "include": "#strings" },
+            { "include": "#keywords" },
+            { "include": "#numbers" },
+            { "include": "#operators" }
+          ]
+        },
+        {
+          "comment": "Invariant annotation: #[invariant(...)]",
+          "name": "meta.attribute.invariant.cbang",
+          "begin": "(#\\[)(invariant)(\\()",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.attribute.cbang" },
+            "2": { "name": "entity.name.function.attribute.invariant.cbang" },
+            "3": { "name": "punctuation.section.arguments.begin.cbang" }
+          },
+          "end": "(\\))(\\])",
+          "endCaptures": {
+            "1": { "name": "punctuation.section.arguments.end.cbang" },
+            "2": { "name": "punctuation.definition.attribute.cbang" }
+          },
+          "patterns": [
+            { "include": "#strings" },
+            { "include": "#keywords" },
+            { "include": "#numbers" },
+            { "include": "#operators" }
+          ]
+        },
+        {
+          "comment": "Property annotation: #[property(...)]",
+          "name": "meta.attribute.property.cbang",
+          "begin": "(#\\[)(property)(\\()",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.attribute.cbang" },
+            "2": { "name": "entity.name.function.attribute.property.cbang" },
+            "3": { "name": "punctuation.section.arguments.begin.cbang" }
+          },
+          "end": "(\\))(\\])",
+          "endCaptures": {
+            "1": { "name": "punctuation.section.arguments.end.cbang" },
+            "2": { "name": "punctuation.definition.attribute.cbang" }
+          },
+          "patterns": [
+            { "include": "#strings" },
+            { "include": "#keywords" },
+            { "include": "#numbers" },
+            { "include": "#operators" }
+          ]
+        },
+        {
+          "comment": "Simple attributes without parens: #[verify]",
+          "name": "meta.attribute.cbang",
+          "match": "(#\\[)([a-zA-Z_][a-zA-Z0-9_]*)(\\])",
+          "captures": {
+            "1": { "name": "punctuation.definition.attribute.cbang" },
+            "2": { "name": "entity.name.function.attribute.cbang" },
+            "3": { "name": "punctuation.definition.attribute.cbang" }
+          }
+        },
+        {
+          "comment": "General attributes with arguments: #[get(\"/path\")], #[auth(...)], etc.",
+          "name": "meta.attribute.cbang",
+          "begin": "(#\\[)([a-zA-Z_][a-zA-Z0-9_]*)(\\()",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.attribute.cbang" },
+            "2": { "name": "entity.name.function.attribute.cbang" },
+            "3": { "name": "punctuation.section.arguments.begin.cbang" }
+          },
+          "end": "(\\))(\\])",
+          "endCaptures": {
+            "1": { "name": "punctuation.section.arguments.end.cbang" },
+            "2": { "name": "punctuation.definition.attribute.cbang" }
+          },
+          "patterns": [
+            { "include": "#strings" },
+            { "include": "#keywords" },
+            { "include": "#types" },
+            { "include": "#numbers" },
+            { "include": "#operators" },
+            { "include": "#constants" }
+          ]
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "comment": "Double-quoted string with interpolation and escapes",
+          "name": "string.quoted.double.cbang",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.cbang",
+              "match": "\\\\[\\\\\"nrt0'{}]"
+            },
+            {
+              "name": "constant.character.escape.unicode.cbang",
+              "match": "\\\\u\\{[0-9a-fA-F]+\\}"
+            },
+            {
+              "name": "constant.character.escape.hex.cbang",
+              "match": "\\\\x[0-9a-fA-F]{2}"
+            },
+            {
+              "comment": "String interpolation {expr}",
+              "name": "meta.interpolation.cbang",
+              "begin": "\\{",
+              "beginCaptures": {
+                "0": { "name": "punctuation.section.interpolation.begin.cbang" }
+              },
+              "end": "\\}",
+              "endCaptures": {
+                "0": { "name": "punctuation.section.interpolation.end.cbang" }
+              },
+              "patterns": [
+                { "include": "#keywords" },
+                { "include": "#numbers" },
+                { "include": "#function-call" },
+                { "include": "#operators" }
+              ]
+            }
+          ]
+        },
+        {
+          "comment": "Raw string literal",
+          "name": "string.quoted.other.raw.cbang",
+          "match": "r\"[^\"]*\""
+        },
+        {
+          "comment": "Character literal",
+          "name": "string.quoted.single.cbang",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.cbang",
+              "match": "\\\\[\\\\\"nrt0']"
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "comment": "Hexadecimal integer",
+          "name": "constant.numeric.hex.cbang",
+          "match": "\\b0x[0-9a-fA-F][0-9a-fA-F_]*\\b"
+        },
+        {
+          "comment": "Binary integer",
+          "name": "constant.numeric.binary.cbang",
+          "match": "\\b0b[01][01_]*\\b"
+        },
+        {
+          "comment": "Octal integer",
+          "name": "constant.numeric.octal.cbang",
+          "match": "\\b0o[0-7][0-7_]*\\b"
+        },
+        {
+          "comment": "Float with decimal point or exponent",
+          "name": "constant.numeric.float.cbang",
+          "match": "\\b[0-9][0-9_]*\\.[0-9][0-9_]*([eE][+-]?[0-9][0-9_]*)?\\b"
+        },
+        {
+          "comment": "Float with exponent only",
+          "name": "constant.numeric.float.cbang",
+          "match": "\\b[0-9][0-9_]*[eE][+-]?[0-9][0-9_]*\\b"
+        },
+        {
+          "comment": "Decimal integer",
+          "name": "constant.numeric.integer.cbang",
+          "match": "\\b[0-9][0-9_]*\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "comment": "Control flow keywords",
+          "name": "keyword.control.cbang",
+          "match": "\\b(if|else|while|for|in|return|match|break|continue|loop|yield)\\b"
+        },
+        {
+          "comment": "Declaration keywords",
+          "name": "keyword.declaration.cbang",
+          "match": "\\b(fn|let|mut|const|type|struct|actor|enum|impl|trait|contract|server|component|module|state|router)\\b"
+        },
+        {
+          "comment": "Visibility and access modifiers",
+          "name": "keyword.other.modifier.cbang",
+          "match": "\\b(pub|priv|pure|async|await)\\b"
+        },
+        {
+          "comment": "Ownership and memory keywords",
+          "name": "keyword.other.ownership.cbang",
+          "match": "\\b(owned|borrowed|shared|move|own)\\b"
+        },
+        {
+          "comment": "Actor and concurrency keywords",
+          "name": "keyword.other.concurrency.cbang",
+          "match": "\\b(spawn|send|receive|on|supervise|reply|parallel|scope)\\b"
+        },
+        {
+          "comment": "Import/export keywords",
+          "name": "keyword.control.import.cbang",
+          "match": "\\b(import|export|use|from)\\b"
+        },
+        {
+          "comment": "Contract/blockchain keywords",
+          "name": "keyword.other.contract.cbang",
+          "match": "\\b(deploy|emit|verify|init|caller|block)\\b"
+        },
+        {
+          "comment": "Web framework keywords",
+          "name": "keyword.other.web.cbang",
+          "match": "\\b(middleware|bind|style)\\b"
+        },
+        {
+          "comment": "Other keywords",
+          "name": "keyword.other.cbang",
+          "match": "\\b(where|as|with|implies|forall|old|sum)\\b"
+        },
+        {
+          "comment": "Self and super",
+          "name": "variable.language.cbang",
+          "match": "\\b(self|super)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "comment": "Primitive numeric types",
+          "name": "storage.type.primitive.cbang",
+          "match": "\\b(i8|i16|i32|i64|u8|u16|u32|u64|u128|u256|f32|f64|usize|isize)\\b"
+        },
+        {
+          "comment": "Other primitive types",
+          "name": "storage.type.primitive.cbang",
+          "match": "\\b(bool|string|String|char|void|never)\\b"
+        },
+        {
+          "comment": "Standard library types",
+          "name": "storage.type.stdlib.cbang",
+          "match": "\\b(Result|Option|Vec|Map|Set|Box|Arc|Rc|Hash|UUID|DateTime|Email|Address|WebSocket|Html)\\b"
+        },
+        {
+          "comment": "Generic type parameter (single uppercase letter or common patterns)",
+          "name": "storage.type.generic.cbang",
+          "match": "\\b([A-Z])\\b(?=\\s*[,>)])"
+        }
+      ]
+    },
+    "function-definition": {
+      "patterns": [
+        {
+          "comment": "Function definition: fn name, pub fn name, pub pure fn name, async fn name",
+          "match": "\\b(pub\\s+)?(pure\\s+)?(async\\s+)?(fn)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.other.modifier.cbang" },
+            "2": { "name": "keyword.other.modifier.cbang" },
+            "3": { "name": "keyword.other.modifier.cbang" },
+            "4": { "name": "keyword.declaration.cbang" },
+            "5": { "name": "entity.name.function.cbang" }
+          }
+        }
+      ]
+    },
+    "type-definition": {
+      "patterns": [
+        {
+          "comment": "Type alias/definition: type Name",
+          "match": "\\b(type)\\s+([A-Z][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.cbang" },
+            "2": { "name": "entity.name.type.cbang" }
+          }
+        }
+      ]
+    },
+    "struct-definition": {
+      "patterns": [
+        {
+          "comment": "Struct definition: struct Name",
+          "match": "\\b(struct)\\s+([A-Z][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.cbang" },
+            "2": { "name": "entity.name.type.struct.cbang" }
+          }
+        }
+      ]
+    },
+    "actor-definition": {
+      "patterns": [
+        {
+          "comment": "Actor definition: actor Name",
+          "match": "\\b(actor)\\s+([A-Z][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.cbang" },
+            "2": { "name": "entity.name.type.actor.cbang" }
+          }
+        }
+      ]
+    },
+    "enum-definition": {
+      "patterns": [
+        {
+          "comment": "Enum definition: enum Name",
+          "match": "\\b(enum)\\s+([A-Z][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.cbang" },
+            "2": { "name": "entity.name.type.enum.cbang" }
+          }
+        }
+      ]
+    },
+    "contract-definition": {
+      "patterns": [
+        {
+          "comment": "Contract definition: contract Name, contract Name : Parent",
+          "match": "\\b(contract)\\s+([A-Z][a-zA-Z0-9_]*)(?:\\s*:\\s*([A-Z][a-zA-Z0-9_]*))?",
+          "captures": {
+            "1": { "name": "keyword.declaration.cbang" },
+            "2": { "name": "entity.name.type.contract.cbang" },
+            "3": { "name": "entity.other.inherited-class.cbang" }
+          }
+        }
+      ]
+    },
+    "server-definition": {
+      "patterns": [
+        {
+          "comment": "Server definition: server Name",
+          "match": "\\b(server)\\s+([A-Z][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.cbang" },
+            "2": { "name": "entity.name.type.server.cbang" }
+          }
+        }
+      ]
+    },
+    "component-definition": {
+      "patterns": [
+        {
+          "comment": "Component definition: component Name",
+          "match": "\\b(component)\\s+([A-Z][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.cbang" },
+            "2": { "name": "entity.name.type.component.cbang" }
+          }
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "comment": "Boolean literals",
+          "name": "constant.language.boolean.cbang",
+          "match": "\\b(true|false)\\b"
+        },
+        {
+          "comment": "None literal",
+          "name": "constant.language.none.cbang",
+          "match": "\\b(None)\\b"
+        },
+        {
+          "comment": "Some constructor",
+          "name": "constant.language.option.cbang",
+          "match": "\\b(Some)\\b"
+        },
+        {
+          "comment": "Ok/Err constructors",
+          "name": "constant.language.result.cbang",
+          "match": "\\b(Ok|Err)\\b"
+        },
+        {
+          "comment": "Enum dot-syntax constants (.always, .never, .minute, .desc, etc.)",
+          "name": "constant.language.enum-variant.cbang",
+          "match": "\\.[a-z_][a-zA-Z0-9_]*\\b"
+        },
+        {
+          "comment": "SCREAMING_SNAKE_CASE constants",
+          "name": "constant.other.caps.cbang",
+          "match": "\\b[A-Z][A-Z0-9_]{2,}\\b"
+        }
+      ]
+    },
+    "function-call": {
+      "patterns": [
+        {
+          "comment": "Function call: name(...)",
+          "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "entity.name.function.call.cbang" }
+          }
+        },
+        {
+          "comment": "Method call: .name(...)",
+          "match": "(?<=\\.)([a-zA-Z_][a-zA-Z0-9_]*)\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "entity.name.function.call.cbang" }
+          }
+        },
+        {
+          "comment": "Namespaced function: Type::name(...)",
+          "match": "\\b([A-Z][a-zA-Z0-9_]*)\\s*(::)\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "storage.type.cbang" },
+            "2": { "name": "punctuation.separator.namespace.cbang" },
+            "3": { "name": "entity.name.function.call.cbang" }
+          }
+        }
+      ]
+    },
+    "macro-call": {
+      "patterns": [
+        {
+          "comment": "Macro invocation: name!(...)",
+          "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*(!)",
+          "captures": {
+            "1": { "name": "entity.name.function.macro.cbang" },
+            "2": { "name": "keyword.operator.macro.cbang" }
+          }
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "comment": "Arrow operators",
+          "name": "keyword.operator.arrow.cbang",
+          "match": "->|=>"
+        },
+        {
+          "comment": "Namespace operator",
+          "name": "punctuation.separator.namespace.cbang",
+          "match": "::"
+        },
+        {
+          "comment": "Range operators",
+          "name": "keyword.operator.range.cbang",
+          "match": "\\.\\.(=)?"
+        },
+        {
+          "comment": "Comparison operators",
+          "name": "keyword.operator.comparison.cbang",
+          "match": "==|!=|<=|>="
+        },
+        {
+          "comment": "Logical operators",
+          "name": "keyword.operator.logical.cbang",
+          "match": "&&|\\|\\||!"
+        },
+        {
+          "comment": "Compound assignment operators",
+          "name": "keyword.operator.assignment.compound.cbang",
+          "match": "\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^="
+        },
+        {
+          "comment": "Assignment operator",
+          "name": "keyword.operator.assignment.cbang",
+          "match": "="
+        },
+        {
+          "comment": "Arithmetic operators",
+          "name": "keyword.operator.arithmetic.cbang",
+          "match": "\\+|-|\\*|/|%"
+        },
+        {
+          "comment": "Bitwise operators",
+          "name": "keyword.operator.bitwise.cbang",
+          "match": "&|\\||\\^|~|<<|>>"
+        },
+        {
+          "comment": "Reference operator",
+          "name": "keyword.operator.reference.cbang",
+          "match": "&(?=mut\\b|[a-zA-Z_])"
+        },
+        {
+          "comment": "Question mark operator (error propagation)",
+          "name": "keyword.operator.question.cbang",
+          "match": "\\?"
+        },
+        {
+          "comment": "Pipe operator",
+          "name": "keyword.operator.pipe.cbang",
+          "match": "\\|>"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.separator.cbang",
+          "match": "[;,]"
+        },
+        {
+          "name": "punctuation.section.block.begin.cbang",
+          "match": "\\{"
+        },
+        {
+          "name": "punctuation.section.block.end.cbang",
+          "match": "\\}"
+        },
+        {
+          "name": "punctuation.section.parens.begin.cbang",
+          "match": "\\("
+        },
+        {
+          "name": "punctuation.section.parens.end.cbang",
+          "match": "\\)"
+        },
+        {
+          "name": "punctuation.section.brackets.begin.cbang",
+          "match": "\\["
+        },
+        {
+          "name": "punctuation.section.brackets.end.cbang",
+          "match": "\\]"
+        }
+      ]
+    }
+  }
+}

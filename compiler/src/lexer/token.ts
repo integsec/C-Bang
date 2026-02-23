@@ -67,6 +67,8 @@ export enum TokenType {
   True = 'true',
   False = 'false',
   Mut = 'mut',
+  While = 'while',
+  Enum = 'enum',
 
   // Operators
   Plus = '+',
@@ -109,6 +111,11 @@ export enum TokenType {
 
   // Special
   Annotation = 'Annotation', // #[...]
+
+  // String interpolation
+  StringStart = 'StringStart',     // "text{
+  StringMiddle = 'StringMiddle',   // }text{
+  StringEnd = 'StringEnd',         // }text"
 
   // Meta
   EOF = 'EOF',
@@ -153,6 +160,8 @@ const KEYWORDS: Record<string, TokenType> = {
   true: TokenType.True,
   false: TokenType.False,
   mut: TokenType.Mut,
+  while: TokenType.While,
+  enum: TokenType.Enum,
 };
 
 export function lookupKeyword(identifier: string): TokenType {

@@ -1,0 +1,79 @@
+// modules.cb — Module declarations, imports, public/private visibility
+//
+// C! organizes code into modules with explicit visibility controls.
+// Public items are accessible outside the module; private items are
+// encapsulated. The use keyword brings items into scope.
+
+use std::collections::HashMap;
+use std::io::File;
+use std::crypto::sha256;
+use std::math::constants::PI as pi;
+
+// Module declaration with inline body
+mod geometry {
+    pub type Point {
+        x: f64,
+        y: f64,
+    }
+
+    // Private helper — only visible within this module
+    fn square(x: f64) -> f64 { x * x }
+
+    pub fn distance(a: &Point, b: &Point) -> f64 {
+        (square(b.x - a.x) + square(b.y - a.y)).sqrt()
+    }
+
+    pub fn midpoint(a: &Point, b: &Point) -> Point {
+        Point { x: (a.x + b.x) / 2.0, y: (a.y + b.y) / 2.0 }
+    }
+}
+
+mod validation {
+    pub fn validate_username(name: &String) -> Result<(), Vec<String>> {
+        let mut errors: Vec<String> = [];
+        if name.len() < 3 { errors.push("Too short"); }
+        if name.len() > 50 { errors.push("Too long"); }
+        if errors.is_empty() { Ok(()) } else { Err(errors) }
+    }
+}
+
+// Nested modules with cross-module references
+mod auth {
+    use super::validation;
+
+    pub type Credentials {
+        username: String,
+        password_hash: String,
+    }
+
+    mod passwords {
+        use std::crypto::sha256;
+        pub fn hash(password: &String) -> String { sha256(password) }
+    }
+
+    pub fn create_credentials(username: String, password: String) -> Result<Credentials, Vec<String>> {
+        validation::validate_username(&username)?;
+        Ok(Credentials { username: username, password_hash: passwords::hash(&password) })
+    }
+}
+
+// Import specific items from our own modules
+use geometry::{Point, distance};
+use auth::create_credentials;
+
+#[intent("Demonstrate module organization, visibility, and imports")]
+fn main() {
+    let a = Point { x: 0.0, y: 0.0 };
+    let b = Point { x: 3.0, y: 4.0 };
+    print("Distance: {distance(&a, &b)}");
+
+    let mid = geometry::midpoint(&a, &b);
+    print("Midpoint: ({mid.x}, {mid.y})");
+
+    match create_credentials("alice_42", "secure_pass") {
+        Ok(creds) => print("Created: {creds.username}"),
+        Err(errors) => {
+            for e in errors { print("Error: {e}"); }
+        }
+    }
+}

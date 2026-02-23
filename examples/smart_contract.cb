@@ -1,0 +1,121 @@
+// smart_contract.cb — Token swap (AMM) and multi-signature wallet
+//
+// Demonstrates advanced smart contracts beyond basic ERC20.
+// Linear types eliminate reentrancy, checked arithmetic prevents
+// overflow, and intent annotations make security properties explicit.
+
+// === TOKEN SWAP (Automated Market Maker) ===
+
+contract TokenSwap {
+    state token_a: Address
+    state token_b: Address
+    state reserve_a: u256
+    state reserve_b: u256
+    state total_liquidity: u256
+    state liquidity: Map<Address, u256>
+    state fee_bps: u256 = 30  // 0.3%
+
+    #[invariant(reserve_a > 0 implies reserve_b > 0)]
+    #[invariant(total_liquidity == sum(liquidity.values()))]
+
+    init(a: Address, b: Address) {
+        token_a = a;
+        token_b = b;
+    }
+
+    #[intent("Add liquidity proportional to current pool ratio.")]
+    #[post(reserve_a == old(reserve_a) + amount_a)]
+    pub fn add_liquidity(amount_a: u256, amount_b: u256) -> Result<u256> {
+        if total_liquidity > 0 {
+            verify!(amount_a * reserve_b == amount_b * reserve_a, "Must match ratio");
+        }
+        let lp = if total_liquidity == 0 { (amount_a * amount_b).sqrt() }
+                 else { (amount_a * total_liquidity) / reserve_a };
+        reserve_a += amount_a;
+        reserve_b += amount_b;
+        total_liquidity += lp;
+        liquidity[caller] += lp;
+        emit LiquidityAdded(caller, amount_a, amount_b, lp);
+        Ok(lp)
+    }
+
+    #[intent("Swap token A for B using constant-product formula minus fee.")]
+    #[post(reserve_a * reserve_b >= old(reserve_a) * old(reserve_b))]
+    pub fn swap_a_for_b(amount_in: u256) -> Result<u256> {
+        verify!(reserve_a > 0 && reserve_b > 0, "No liquidity");
+        let fee_adj = amount_in * (10000 - fee_bps);
+        let out = (fee_adj * reserve_b) / (reserve_a * 10000 + fee_adj);
+        verify!(out > 0, "Insufficient output");
+        reserve_a += amount_in;
+        reserve_b -= out;
+        emit Swap(caller, amount_in, out);
+        Ok(out)
+    }
+}
+
+// === MULTI-SIGNATURE WALLET ===
+
+#[verify]
+contract MultiSigWallet {
+    state owners: Vec<Address>{len: 1..20}
+    state required: u256
+    state txs: Map<u256, Transaction>
+    state confirms: Map<u256, Map<Address, bool>>
+    state tx_count: u256 = 0
+
+    type Transaction { to: Address, value: u256, executed: bool }
+
+    #[invariant(required <= owners.len() as u256)]
+
+    init(initial_owners: Vec<Address>, req: u256) {
+        verify!(req > 0 && req <= initial_owners.len() as u256, "Invalid threshold");
+        owners = initial_owners;
+        required = req;
+    }
+
+    #[intent("Submit a transaction for multi-sig approval.")]
+    pub fn submit(to: Address, value: u256) -> Result<u256> {
+        verify!(owners.contains(&caller), "Not an owner");
+        let id = tx_count;
+        txs[id] = Transaction { to: to, value: value, executed: false };
+        tx_count += 1;
+        emit TransactionSubmitted(id, caller, to, value);
+        Ok(id)
+    }
+
+    #[intent("Confirm a pending transaction. Each owner confirms once.")]
+    pub fn confirm(id: u256) -> Result<()> {
+        verify!(owners.contains(&caller), "Not an owner");
+        verify!(!confirms[id][caller], "Already confirmed");
+        confirms[id][caller] = true;
+        emit Confirmed(id, caller);
+        Ok(())
+    }
+
+    #[intent("Execute a fully-confirmed transaction. Cannot execute twice.")]
+    #[post(txs[id].executed == true)]
+    pub fn execute(id: u256) -> Result<()> {
+        verify!(!txs[id].executed, "Already executed");
+        verify!(confirm_count(id) >= required, "Not enough confirmations");
+        txs[id].executed = true;
+        txs[id].to.transfer(txs[id].value);
+        emit Executed(id);
+        Ok(())
+    }
+
+    pure fn confirm_count(id: u256) -> u256 {
+        owners.iter().filter(|o| confirms[id][*o]).count() as u256
+    }
+}
+
+#[intent("Deploy token swap and multi-sig wallet contracts")]
+fn main() {
+    let swap = deploy TokenSwap(a: Address::from("0xA"), b: Address::from("0xB"));
+    print("Swap at: {swap.address}");
+
+    let wallet = deploy MultiSigWallet(
+        initial_owners: [Address::from("0xAlice"), Address::from("0xBob"), Address::from("0xCharlie")],
+        req: 2,
+    );
+    print("Wallet at: {wallet.address}");
+}

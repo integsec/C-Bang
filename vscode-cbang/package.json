@@ -1,0 +1,50 @@
+{
+  "name": "cbang",
+  "displayName": "C! (C-Bang)",
+  "description": "Syntax highlighting and language support for C! (C-Bang)",
+  "version": "0.1.0",
+  "publisher": "integsec",
+  "license": "Apache-2.0",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/integsec/C-Bang"
+  },
+  "keywords": [
+    "c-bang",
+    "cbang",
+    "programming language",
+    "smart contracts",
+    "linear types",
+    "actor model",
+    "wasm"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "cbang",
+        "aliases": [
+          "C!",
+          "C-Bang",
+          "cbang"
+        ],
+        "extensions": [
+          ".cb"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "cbang",
+        "scopeName": "source.cbang",
+        "path": "./syntaxes/cbang.tmLanguage.json"
+      }
+    ]
+  }
+}

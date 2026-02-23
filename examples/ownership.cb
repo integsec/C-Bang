@@ -1,0 +1,84 @@
+// ownership.cb — Demonstrate linear types and ownership transfer
+//
+// C! uses a linear/affine type system where every value has exactly one owner.
+// When a value is passed to another function, ownership moves and the original
+// binding becomes invalid. This eliminates use-after-free, double-free, and
+// double-spend bugs by construction.
+
+// A resource that must be explicitly consumed — cannot be copied or dropped
+type FileHandle {
+    path: String,
+    fd: i32,
+}
+
+// A token representing a unique, non-copyable asset
+type UniqueToken {
+    id: u64,
+    value: u256,
+    owner: Address,
+}
+
+// Opening a file returns an owned handle — caller is responsible for closing it
+#[intent("Open a file and return ownership of the handle to the caller")]
+fn open_file(path: String) -> Result<FileHandle, IoError> with IO {
+    let fd = io::open(path, .read_write)?;
+    Ok(FileHandle { path: path, fd: fd })
+}
+
+// This function takes ownership of the handle — after calling, handle is consumed
+#[intent("Write data to a file and return ownership back to the caller")]
+fn write_to_file(handle: own FileHandle, data: &String) -> Result<FileHandle, IoError> with IO {
+    io::write(handle.fd, data)?;
+    Ok(handle)  // return ownership back
+}
+
+// Closing a file consumes the handle permanently — no use-after-close possible
+#[intent("Close the file handle, releasing the underlying resource")]
+fn close_file(handle: own FileHandle) -> Result<(), IoError> with IO {
+    io::close(handle.fd)?;
+    Ok(())
+    // handle is consumed here — no code can use it after this point
+}
+
+// Borrowing: read-only access without taking ownership
+fn print_file_info(handle: &FileHandle) {
+    print("File: {handle.path} (fd={handle.fd})");
+}
+
+// Transfer of a unique token — the sender no longer has it
+#[intent("Transfer a unique token to a new owner. Sender loses access.")]
+fn transfer_token(token: own UniqueToken, new_owner: Address) -> UniqueToken {
+    UniqueToken {
+        id: token.id,
+        value: token.value,
+        owner: new_owner,
+    }
+}
+
+// Demonstrating the scope construct for explicit resource lifetime
+fn process_data() -> Result<(), IoError> with IO {
+    // scope ensures data is released at the end of the block
+    scope buffer = allocate_buffer(4096) {
+        buffer.write("processing...");
+        let result = buffer.flush();
+        print("Processed {buffer.len()} bytes");
+    }  // buffer is released here, guaranteed by the compiler
+
+    Ok(())
+}
+
+#[intent("Demonstrate ownership semantics with files and tokens")]
+fn main() with IO {
+    // File ownership example
+    let handle = open_file("data.txt")?;
+    print_file_info(&handle);            // borrow — handle still valid
+    let handle = write_to_file(handle, &"Hello, ownership!")?;  // move and return
+    close_file(handle)?;                 // consumed — handle gone after this
+    // handle cannot be used here — compile error if attempted
+
+    // Token ownership example
+    let token = UniqueToken { id: 1, value: 1000, owner: Address::zero() };
+    let token = transfer_token(token, Address::from("0xAlice"));
+    // Original binding consumed — double-spend is impossible
+    print("Token {token.id} now owned by {token.owner}");
+}

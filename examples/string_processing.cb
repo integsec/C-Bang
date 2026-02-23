@@ -1,0 +1,103 @@
+// string_processing.cb — String interpolation, parsing, formatting
+//
+// C! strings support interpolation with {expr} syntax. Refined string
+// types enforce constraints at compile time. This example demonstrates
+// string manipulation, parsing, and formatting patterns.
+
+// Refined string types — constraints checked at compile time
+type Identifier = String{len: 1..64, matches: r"^[a-zA-Z_][a-zA-Z0-9_]*$"}
+type SemVer = String{matches: r"^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$"}
+
+type Version {
+    major: u32,
+    minor: u32,
+    patch: u32,
+    pre_release: Option<String>,
+}
+
+type LogEntry {
+    timestamp: String,
+    level: LogLevel,
+    message: String,
+}
+
+type LogLevel = Debug | Info | Warn | Error | Fatal
+
+// String interpolation with expressions
+fn format_greeting(name: String, age: u32) -> String {
+    let status = if age >= 18 { "adult" } else { "minor" };
+    format("Hello, {name}! You are {age} years old ({status}).")
+}
+
+// Parse a semantic version string into components
+fn parse_version(s: SemVer) -> Result<Version, String> {
+    let parts = s.split(".");
+    if parts.len() < 3 { return Err("Invalid format"); }
+    let major = parts[0].parse::<u32>().map_err(|_| "Bad major")?;
+    let minor = parts[1].parse::<u32>().map_err(|_| "Bad minor")?;
+    let patch_parts = parts[2].split("-");
+    let patch = patch_parts[0].parse::<u32>().map_err(|_| "Bad patch")?;
+    let pre = if patch_parts.len() > 1 { Some(patch_parts[1..].join("-")) } else { None };
+    Ok(Version { major: major, minor: minor, patch: patch, pre_release: pre })
+}
+
+fn version_to_string(v: &Version) -> String {
+    match &v.pre_release {
+        Some(pre) => format("{v.major}.{v.minor}.{v.patch}-{pre}"),
+        None      => format("{v.major}.{v.minor}.{v.patch}"),
+    }
+}
+
+// Format a table with aligned columns
+fn format_table(headers: &Vec<String>, rows: &Vec<Vec<String>>) -> String {
+    let mut widths: Vec<usize> = headers.iter().map(|h| h.len()).collect();
+    for row in rows {
+        for (i, cell) in row.iter().enumerate() {
+            if i < widths.len() && cell.len() > widths[i] { widths[i] = cell.len(); }
+        }
+    }
+    let mut out = String::new();
+    for (i, h) in headers.iter().enumerate() { out += format("{h:width$}  ", width = widths[i]); }
+    out += "\n";
+    for w in &widths { out += format("{:-<w$}  ", ""); }
+    out += "\n";
+    for row in rows {
+        for (i, cell) in row.iter().enumerate() {
+            out += format("{cell:width$}  ", width = widths[i]);
+        }
+        out += "\n";
+    }
+    out
+}
+
+// Case conversion utilities
+fn to_snake_case(input: &String) -> String {
+    let mut result = String::new();
+    for (i, c) in input.chars().enumerate() {
+        if c.is_uppercase() && i > 0 { result += "_"; }
+        result += c.to_lowercase().to_string();
+    }
+    result
+}
+
+fn to_camel_case(input: &String) -> String {
+    input.split("_").enumerate().map(|(i, part)| {
+        if i == 0 { part.to_string() }
+        else { format("{}{}", part[0..1].to_uppercase(), part[1..]) }
+    }).collect::<Vec<String>>().join("")
+}
+
+#[intent("Demonstrate string processing: parsing, formatting, interpolation")]
+fn main() {
+    print(format_greeting("Alice", 25));
+
+    let v = parse_version("2.1.0-beta.3")?;
+    print("Parsed: {v.major}.{v.minor}.{v.patch}, pre={v.pre_release}");
+
+    let headers = ["Name", "Role", "Status"];
+    let rows = [["Alice", "Admin", "Active"], ["Bob", "Editor", "Inactive"]];
+    print(format_table(&headers, &rows));
+
+    print(to_snake_case(&"MyVariableName"));
+    print(to_camel_case(&"my_variable_name"));
+}

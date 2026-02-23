@@ -13,8 +13,10 @@ import type {
   FieldDecl, StateDecl, OnHandler, SuperviseDecl, InitDecl,
   MatchArm, Pattern, CallArg, TypeParam, ActorMember,
   ContractMember, ServerMember,
-  LetStmt, ReturnStmt, ReplyStmt, EmitStmt, ForStmt, IfStmt,
+  LetStmt, ReturnStmt, ReplyStmt, EmitStmt, ForStmt, WhileStmt, IfStmt,
   MatchStmt, SpawnStmt,
+  EnumDecl, EnumVariant, ArrayType, ClosureParam,
+  StringInterpolationPart,
 } from '../ast/index.js';
 import { Diagnostic, createError } from '../errors/index.js';
 
@@ -23,6 +25,7 @@ export class Parser {
   private pos: number = 0;
   private diagnostics: Diagnostic[] = [];
   private allowRefinement: boolean = true;
+  private allowUnionType: boolean = true;
 
   constructor(tokens: Token[]) {
     // Filter out comments and newlines
@@ -80,6 +83,8 @@ export class Parser {
         return this.parseServerDecl(annotations, visibility);
       case TokenType.Component:
         return this.parseComponentDecl(annotations, visibility);
+      case TokenType.Enum:
+        return this.parseEnumDecl(annotations, visibility);
       case TokenType.Use:
         return this.parseUseDecl();
       case TokenType.Mod:
@@ -735,13 +740,79 @@ export class Parser {
     return { kind: 'ModDecl', name, body: null, span: this.spanFrom(start) };
   }
 
+  // ─── Enum Declaration ──────────────────────────────────────────
+
+  private parseEnumDecl(annotations: Annotation[], visibility: Visibility): EnumDecl {
+    const start = this.current().span;
+    this.expect(TokenType.Enum, "Expected 'enum'");
+    const name = this.expectIdentOrType("Expected enum name");
+
+    const typeParams = this.parseTypeParams();
+
+    this.expect(TokenType.LeftBrace, "Expected '{'");
+
+    const variants: EnumVariant[] = [];
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      variants.push(this.parseEnumVariant());
+      this.match(TokenType.Comma);
+    }
+
+    this.expect(TokenType.RightBrace, "Expected '}'");
+
+    return {
+      kind: 'EnumDecl',
+      name,
+      annotations,
+      visibility,
+      typeParams,
+      variants,
+      span: this.spanFrom(start),
+    };
+  }
+
+  private parseEnumVariant(): EnumVariant {
+    const start = this.current().span;
+    const name = this.expectIdentOrType("Expected variant name");
+
+    // Tuple variant: Variant(T1, T2)
+    if (this.check(TokenType.LeftParen)) {
+      this.advance();
+      const fields: TypeExpr[] = [];
+      if (!this.check(TokenType.RightParen)) {
+        fields.push(this.parseTypeExpr());
+        while (this.check(TokenType.Comma)) {
+          this.advance();
+          if (this.check(TokenType.RightParen)) break;
+          fields.push(this.parseTypeExpr());
+        }
+      }
+      this.expect(TokenType.RightParen, "Expected ')'");
+      return { kind: 'TupleVariant', name, fields, span: this.spanFrom(start) };
+    }
+
+    // Struct variant: Variant { field: Type }
+    if (this.check(TokenType.LeftBrace)) {
+      this.advance();
+      const fields: FieldDecl[] = [];
+      while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+        fields.push(this.parseFieldDecl());
+        this.match(TokenType.Comma);
+      }
+      this.expect(TokenType.RightBrace, "Expected '}'");
+      return { kind: 'StructVariant', name, fields, span: this.spanFrom(start) };
+    }
+
+    // Unit variant: Variant
+    return { kind: 'UnitVariant', name, span: this.spanFrom(start) };
+  }
+
   // ─── Type Expressions ──────────────────────────────────────────
 
   parseTypeExpr(): TypeExpr {
     let left = this.parsePrimaryType();
 
     // Union type: A | B | C
-    if (this.check(TokenType.Pipe)) {
+    if (this.allowUnionType && this.check(TokenType.Pipe)) {
       const types: TypeExpr[] = [left];
       while (this.check(TokenType.Pipe)) {
         this.advance();
@@ -781,6 +852,14 @@ export class Parser {
       this.advance();
       const inner = this.parsePrimaryType();
       return { kind: 'SharedType', inner, span: this.spanFrom(start) };
+    }
+
+    // Array type: [T]
+    if (this.check(TokenType.LeftBracket)) {
+      this.advance();
+      const elementType = this.parseTypeExpr();
+      this.expect(TokenType.RightBracket, "Expected ']'");
+      return { kind: 'ArrayType', elementType, span: this.spanFrom(start) } as ArrayType;
     }
 
     // Named or generic type
@@ -921,6 +1000,8 @@ export class Parser {
         return this.parseEmitStmt();
       case TokenType.For:
         return this.parseForStmt();
+      case TokenType.While:
+        return this.parseWhileStmt();
       case TokenType.If:
         return this.parseIfStmt();
       case TokenType.Match:
@@ -1035,6 +1116,14 @@ export class Parser {
     const iterable = this.parseExpr();
     const body = this.parseBlock();
     return { kind: 'ForStmt', variable, iterable, body, span: this.spanFrom(start) };
+  }
+
+  private parseWhileStmt(): WhileStmt {
+    const start = this.current().span;
+    this.expect(TokenType.While, "Expected 'while'");
+    const condition = this.parseExpr();
+    const body = this.parseBlock();
+    return { kind: 'WhileStmt', condition, body, span: this.spanFrom(start) };
   }
 
   private parseIfStmt(): IfStmt {
@@ -1299,6 +1388,11 @@ export class Parser {
       return { kind: 'StringLiteral', value: this.advance().value, span: this.spanFrom(start) };
     }
 
+    // Interpolated string: "text{expr}more{expr2}end"
+    if (this.check(TokenType.StringStart)) {
+      return this.parseStringInterpolation();
+    }
+
     // Bool literal
     if (this.check(TokenType.BoolLiteral)) {
       return { kind: 'BoolLiteral', value: this.advance().value === 'true', span: this.spanFrom(start) };
@@ -1424,6 +1518,28 @@ export class Parser {
       return { kind: 'Ident', name, span: this.spanFrom(start) };
     }
 
+    // Array literal: [expr, expr, ...]
+    if (this.check(TokenType.LeftBracket)) {
+      this.advance();
+      const elements: Expr[] = [];
+      if (!this.check(TokenType.RightBracket)) {
+        elements.push(this.parseExpr());
+        while (this.check(TokenType.Comma)) {
+          this.advance();
+          if (this.check(TokenType.RightBracket)) break;
+          elements.push(this.parseExpr());
+        }
+      }
+      this.expect(TokenType.RightBracket, "Expected ']'");
+      return { kind: 'ArrayLiteral', elements, span: this.spanFrom(start) };
+    }
+
+    // Closure: |params| body or |params| -> RetType { body }
+    // Also handle || for zero-param closures (lexer tokenizes || as Or)
+    if (this.check(TokenType.Pipe) || this.check(TokenType.Or)) {
+      return this.parseClosureExpr();
+    }
+
     // Parenthesized expression
     if (this.check(TokenType.LeftParen)) {
       this.advance();
@@ -1490,6 +1606,103 @@ export class Parser {
 
     const value = this.parseExpr();
     return { kind: 'CallArg', name: null, value, span: this.spanFrom(start) };
+  }
+
+  // ─── String Interpolation ──────────────────────────────────────
+
+  private parseStringInterpolation(): Expr {
+    const start = this.current().span;
+    const parts: StringInterpolationPart[] = [];
+
+    // First part: StringStart token contains text before first {
+    const startToken = this.advance();
+    if (startToken.value.length > 0) {
+      parts.push({ kind: 'Literal', value: startToken.value });
+    }
+
+    // Parse the interpolated expression
+    parts.push({ kind: 'Expr', expr: this.parseExpr() });
+
+    // Continue parsing StringMiddle/StringEnd segments
+    while (this.check(TokenType.StringMiddle)) {
+      const mid = this.advance();
+      if (mid.value.length > 0) {
+        parts.push({ kind: 'Literal', value: mid.value });
+      }
+      parts.push({ kind: 'Expr', expr: this.parseExpr() });
+    }
+
+    if (this.check(TokenType.StringEnd)) {
+      const end = this.advance();
+      if (end.value.length > 0) {
+        parts.push({ kind: 'Literal', value: end.value });
+      }
+    } else {
+      this.error("Expected end of interpolated string");
+    }
+
+    return { kind: 'StringInterpolation', parts, span: this.spanFrom(start) };
+  }
+
+  // ─── Closure Expression ─────────────────────────────────────────
+
+  private parseClosureExpr(): Expr {
+    const start = this.current().span;
+
+    // Handle || as empty params (lexer tokenizes || as a single Or token)
+    const params: ClosureParam[] = [];
+    if (this.check(TokenType.Or)) {
+      this.advance(); // consume ||
+    } else {
+      this.expect(TokenType.Pipe, "Expected '|'");
+      if (!this.check(TokenType.Pipe)) {
+        params.push(this.parseClosureParam());
+        while (this.check(TokenType.Comma)) {
+          this.advance();
+          if (this.check(TokenType.Pipe)) break;
+          params.push(this.parseClosureParam());
+        }
+      }
+      this.expect(TokenType.Pipe, "Expected '|'");
+    }
+
+    let returnType: TypeExpr | null = null;
+    if (this.check(TokenType.Arrow)) {
+      this.advance();
+      this.allowRefinement = false;
+      returnType = this.parseTypeExpr();
+      this.allowRefinement = true;
+    }
+
+    let body: Expr | Block;
+    if (this.check(TokenType.LeftBrace)) {
+      body = this.parseBlock();
+    } else {
+      body = this.parseExpr();
+    }
+
+    return {
+      kind: 'Closure',
+      params,
+      returnType,
+      body,
+      span: this.spanFrom(start),
+    };
+  }
+
+  private parseClosureParam(): ClosureParam {
+    const start = this.current().span;
+    const name = this.expectIdent("Expected closure parameter name");
+    let typeAnnotation: TypeExpr | null = null;
+    if (this.check(TokenType.Colon)) {
+      this.advance();
+      // Disable union type parsing so | is not consumed as a union separator
+      const prevAllow = this.allowUnionType;
+      this.allowUnionType = false;
+      typeAnnotation = this.parseTypeExpr();
+      this.allowUnionType = prevAllow;
+    }
+    return { kind: 'ClosureParam', name, typeAnnotation, span: this.spanFrom(start) };
   }
 
   // ─── Operator Precedence ───────────────────────────────────────
@@ -1620,7 +1833,8 @@ export class Parser {
       if (
         t === TokenType.Fn || t === TokenType.Type || t === TokenType.Actor ||
         t === TokenType.Contract || t === TokenType.Server || t === TokenType.Component ||
-        t === TokenType.Use || t === TokenType.Mod || t === TokenType.Pub
+        t === TokenType.Use || t === TokenType.Mod || t === TokenType.Pub ||
+        t === TokenType.Enum
       ) {
         return;
       }

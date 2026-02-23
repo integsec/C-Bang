@@ -1,0 +1,89 @@
+// generics.cb — Generic functions and structs with type parameters
+//
+// C! supports parametric polymorphism through type parameters on functions,
+// structs, and enums. Where clauses constrain type parameters to require
+// specific trait implementations.
+
+// A generic stack backed by an array
+type Stack<T> {
+    items: Vec<T>,
+    capacity: usize,
+}
+
+fn push<T>(stack: &mut Stack<T>, item: T) -> Result<(), String> {
+    if stack.items.len() >= stack.capacity {
+        return Err("Stack overflow: capacity exceeded");
+    }
+    stack.items.push(item);
+    Ok(())
+}
+
+fn pop<T>(stack: &mut Stack<T>) -> Option<T> {
+    stack.items.pop()
+}
+
+// A generic key-value pair with a trait-bounded formatter
+type Pair<K, V> {
+    key: K,
+    value: V,
+}
+
+fn format_pair<K, V>(pair: &Pair<K, V>) -> String
+    where K: Display, V: Display
+{
+    format("{pair.key}: {pair.value}")
+}
+
+// A generic binary tree
+type Tree<T> =
+    | Leaf(T)
+    | Branch(Tree<T>, Tree<T>)
+    | Empty
+
+fn tree_depth<T>(tree: &Tree<T>) -> usize {
+    match tree {
+        Empty        => 0,
+        Leaf(_)      => 1,
+        Branch(l, r) => 1 + max_of(tree_depth(l), tree_depth(r)),
+    }
+}
+
+// Map over a tree, transforming all values
+fn tree_map<A, B>(tree: Tree<A>, f: fn(A) -> B) -> Tree<B> {
+    match tree {
+        Empty        => Empty,
+        Leaf(val)    => Leaf(f(val)),
+        Branch(l, r) => Branch(tree_map(l, f), tree_map(r, f)),
+    }
+}
+
+// Fold a tree into a single value
+fn tree_fold<T, R>(tree: &Tree<T>, init: R, f: fn(R, &T) -> R) -> R {
+    match tree {
+        Empty        => init,
+        Leaf(val)    => f(init, val),
+        Branch(l, r) => tree_fold(r, tree_fold(l, init, f), f),
+    }
+}
+
+fn max_of<T>(a: T, b: T) -> T where T: Ord {
+    if a >= b { a } else { b }
+}
+
+#[intent("Demonstrate generic types, functions, and trait constraints")]
+fn main() {
+    let mut stack = Stack::<i32> { items: [], capacity: 10 };
+    push(&mut stack, 42)?;
+    push(&mut stack, 17)?;
+    print("Popped: {pop(&mut stack)}");
+
+    let pair = Pair { key: "lang", value: "C!" };
+    print(format_pair(&pair));
+
+    let tree = Branch(Branch(Leaf(1), Leaf(2)), Leaf(3));
+    print("Depth: {tree_depth(&tree)}");
+
+    let doubled = tree_map(tree, |x| x * 2);
+    let sum = tree_fold(&doubled, 0, |acc, val| acc + val);
+    print("Sum of doubled tree: {sum}");
+}

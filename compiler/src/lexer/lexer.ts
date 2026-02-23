@@ -14,6 +14,8 @@ export class Lexer {
   private line: number = 1;
   private column: number = 1;
   private tokens: Token[] = [];
+  /** Stack tracking brace depth for each nested string interpolation */
+  private interpolationStack: number[] = [];
 
   constructor(source: string, file: string = '<stdin>') {
     this.source = source;
@@ -39,8 +41,25 @@ export class Lexer {
       // Single-character tokens
       case '(': this.addToken(TokenType.LeftParen, ch, start); break;
       case ')': this.addToken(TokenType.RightParen, ch, start); break;
-      case '{': this.addToken(TokenType.LeftBrace, ch, start); break;
-      case '}': this.addToken(TokenType.RightBrace, ch, start); break;
+      case '{':
+        if (this.interpolationStack.length > 0) {
+          this.interpolationStack[this.interpolationStack.length - 1]!++;
+        }
+        this.addToken(TokenType.LeftBrace, ch, start);
+        break;
+      case '}':
+        if (this.interpolationStack.length > 0) {
+          const depth = this.interpolationStack[this.interpolationStack.length - 1]!;
+          if (depth === 0) {
+            // End of interpolation expression — resume string lexing
+            this.interpolationStack.pop();
+            this.interpolatedStringContinuation(start);
+            break;
+          }
+          this.interpolationStack[this.interpolationStack.length - 1]!--;
+        }
+        this.addToken(TokenType.RightBrace, ch, start);
+        break;
       case '[': this.addToken(TokenType.LeftBracket, ch, start); break;
       case ']': this.addToken(TokenType.RightBracket, ch, start); break;
       case ',': this.addToken(TokenType.Comma, ch, start); break;
@@ -165,7 +184,13 @@ export class Lexer {
         value += this.advance();
       }
     }
-    this.addToken(TokenType.Comment, value, start);
+
+    if (depth > 0) {
+      // Block comment was never closed — emit an error token
+      this.addToken(TokenType.Error, 'unterminated block comment', start);
+    } else {
+      this.addToken(TokenType.Comment, value, start);
+    }
   }
 
   private annotation(start: Position): void {
@@ -190,11 +215,19 @@ export class Lexer {
           case 'n': value += '\n'; break;
           case 't': value += '\t'; break;
           case 'r': value += '\r'; break;
+          case '0': value += '\0'; break;
           case '\\': value += '\\'; break;
           case '"': value += '"'; break;
           case '{': value += '{'; break;
+          case '}': value += '}'; break;
           default: value += '\\' + escaped;
         }
+      } else if (this.peek() === '{') {
+        // String interpolation: "text{expr}more"
+        this.advance(); // consume '{'
+        this.addToken(TokenType.StringStart, value, start);
+        this.interpolationStack.push(0);
+        return;
       } else {
         value += this.advance();
       }
@@ -207,6 +240,44 @@ export class Lexer {
 
     this.advance(); // closing quote
     this.addToken(TokenType.StringLiteral, value, start);
+  }
+
+  /** Resume lexing a string after an interpolation expression ends (at '}') */
+  private interpolatedStringContinuation(start: Position): void {
+    let value = '';
+    while (!this.isAtEnd() && this.peek() !== '"') {
+      if (this.peek() === '\\') {
+        this.advance();
+        const escaped = this.advance();
+        switch (escaped) {
+          case 'n': value += '\n'; break;
+          case 't': value += '\t'; break;
+          case 'r': value += '\r'; break;
+          case '0': value += '\0'; break;
+          case '\\': value += '\\'; break;
+          case '"': value += '"'; break;
+          case '{': value += '{'; break;
+          case '}': value += '}'; break;
+          default: value += '\\' + escaped;
+        }
+      } else if (this.peek() === '{') {
+        // Another interpolation segment
+        this.advance();
+        this.addToken(TokenType.StringMiddle, value, start);
+        this.interpolationStack.push(0);
+        return;
+      } else {
+        value += this.advance();
+      }
+    }
+
+    if (this.isAtEnd()) {
+      this.addToken(TokenType.Error, value, start);
+      return;
+    }
+
+    this.advance(); // closing quote
+    this.addToken(TokenType.StringEnd, value, start);
   }
 
   private number(first: string, start: Position): void {

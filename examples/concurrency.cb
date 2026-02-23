@@ -1,0 +1,90 @@
+// concurrency.cb — Actor spawning, message passing, async/await
+//
+// C! uses the actor model for concurrency: each actor has isolated
+// state, communicates through messages, and is supervised for fault
+// tolerance. Structured concurrency (parallel blocks) coordinates
+// multi-step operations safely.
+
+type Task {
+    id: u64,
+    payload: String,
+    priority: u32{1..10},
+}
+
+type TaskResult {
+    task_id: u64,
+    worker_id: u64,
+    output: String,
+}
+
+// A worker actor that processes tasks one at a time
+actor Worker {
+    state id: u64
+    state tasks_completed: u64 = 0
+    state coordinator: Coordinator
+
+    on ProcessTask(task: Task) {
+        let output = format("Processed: {task.payload}");
+        tasks_completed += 1;
+        coordinator.send(TaskComplete(TaskResult {
+            task_id: task.id, worker_id: id, output: output,
+        }));
+    }
+
+    on GetStats() -> (u64, u64) {
+        reply (id, tasks_completed);
+    }
+}
+
+// Coordinator distributes work across a pool of workers
+actor Coordinator {
+    state workers: Vec<Worker>
+    state results: Vec<TaskResult>
+    state next_worker: usize = 0
+
+    on Initialize(count: u32{1..100}) {
+        for i in 0..count {
+            workers.push(spawn Worker { id: i as u64, coordinator: self });
+        }
+    }
+
+    on SubmitTask(task: Task) {
+        workers[next_worker].send(ProcessTask(task));
+        next_worker = (next_worker + 1) % workers.len();
+    }
+
+    on TaskComplete(result: TaskResult) {
+        print("Task {result.task_id} done by worker {result.worker_id}");
+        results.push(result);
+    }
+
+    supervise Worker { restart: .always, max_restarts: 5 per .minute }
+}
+
+// Structured concurrency: parallel execution within an actor
+actor OrderProcessor {
+    on ProcessOrder(order_id: u64) -> Result<String, String> {
+        // Both run concurrently; both must succeed or both cancel
+        let (stock, payment) = parallel {
+            inventory.ask(CheckStock(order_id)),
+            payments.ask(Authorize(order_id)),
+        };
+        match (stock, payment) {
+            (Ok(_), Ok(receipt)) => reply Ok(format("Order {order_id} confirmed")),
+            (Err(e), _)          => reply Err(format("Stock: {e}")),
+            (_, Err(e))          => reply Err(format("Payment: {e}")),
+        }
+    }
+}
+
+#[intent("Demonstrate actor concurrency with worker pools and supervision")]
+fn main() {
+    let coord = spawn Coordinator();
+    coord.send(Initialize(4));
+
+    for i in 0..10 {
+        coord.send(SubmitTask(Task {
+            id: i, payload: format("data-{i}"), priority: (i % 10 + 1) as u32,
+        }));
+    }
+}

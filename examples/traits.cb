@@ -1,0 +1,87 @@
+// traits.cb — Trait definitions, implementations, trait bounds
+//
+// Traits in C! define shared behavior as method signatures. Types
+// implement traits to provide concrete behavior. Trait bounds on
+// generics ensure type-safe polymorphism.
+
+trait Summary {
+    fn title(&self) -> String;
+    fn author(&self) -> String;
+
+    // Default implementation — types can override
+    fn summarize(&self) -> String {
+        format("{self.title()} by {self.author()}")
+    }
+}
+
+trait Display {
+    fn display(&self) -> String;
+}
+
+type Article {
+    headline: String,
+    writer: String,
+    content: String,
+}
+
+type Tweet {
+    username: String,
+    text: String{len: 1..280},
+    retweets: u32,
+}
+
+impl Summary for Article {
+    fn title(&self) -> String { self.headline }
+    fn author(&self) -> String { self.writer }
+    // Override default: include content length
+    fn summarize(&self) -> String {
+        format("{self.headline} by {self.writer} ({self.content.len()} chars)")
+    }
+}
+
+// Tweet uses the default summarize implementation
+impl Summary for Tweet {
+    fn title(&self) -> String { self.text }
+    fn author(&self) -> String { format("@{self.username}") }
+}
+
+impl Display for Tweet {
+    fn display(&self) -> String {
+        format("@{self.username}: {self.text} ({self.retweets} RT)")
+    }
+}
+
+// Generic function with trait bounds
+fn notify<T>(item: &T) where T: Summary {
+    print("Breaking: {item.summarize()}");
+}
+
+// Multiple trait bounds
+fn detailed_notify<T>(item: &T) where T: Summary + Display {
+    print("Summary: {item.summarize()}");
+    print("Full: {item.display()}");
+}
+
+// Return the item with the longest title
+fn longest_title<T>(items: &Vec<T>) -> Option<&T> where T: Summary {
+    if items.is_empty() { return None; }
+    let mut best = &items[0];
+    for item in items {
+        if item.title().len() > best.title().len() { best = item; }
+    }
+    Some(best)
+}
+
+#[intent("Demonstrate trait definitions, implementations, and trait bounds")]
+fn main() {
+    let article = Article {
+        headline: "C! Language Released",
+        writer: "Tech Team",
+        content: "A new language for AI-human collaboration...",
+    };
+    let tweet = Tweet { username: "cbang_lang", text: "C! is open source!", retweets: 42 };
+
+    notify(&article);
+    notify(&tweet);
+    detailed_notify(&tweet);
+}
