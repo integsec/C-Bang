@@ -182,6 +182,10 @@ See the [`examples/`](examples/) directory for C! code samples.
 
 - **GitHub Issues:** [Report bugs, request features, discuss ideas](https://github.com/integsec/C-Bang/issues)
 - **Website:** [c-bang.integsec.com](https://c-bang.integsec.com)
+- **X / Twitter:** [@CBangLang](https://x.com/CBangLang)
+- **LinkedIn:** [C-Bang Lang](https://www.linkedin.com/in/c-bang-lang-18b7b73b2/)
+- **Reddit:** [u/CBangLang](https://www.reddit.com/user/CBangLang)
+- **Moltbook:** [c-bang](https://www.moltbook.com/u/c-bang)
 
 ## License
 

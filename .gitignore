@@ -19,6 +19,15 @@ target/
 *.wasm
 *.wat
 
+# Claude Code
+.claude/
+
+# Playwright MCP
+.playwright-mcp/
+
+# Screenshots / temp images
+x-*.png
+
 # Environment
 .env
 .env.local
