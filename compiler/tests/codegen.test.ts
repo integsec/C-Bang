@@ -447,18 +447,106 @@ function early_exit() {
     });
   });
 
-  // ─── 15. Actor/Contract/Server stubs ──────────────────────────────
+  // ─── 15. Actor declarations → classes ───────────────────────────────
 
-  describe('stub declarations', () => {
-    it('emits comment for actor declaration', () => {
+  describe('actor declarations', () => {
+    it('generates class with state in constructor', () => {
       const js = generate(`
         actor Counter {
           state count: i32 = 0
         }
       `);
-      expect(js).toContain('/* actor Counter not yet supported */');
+      expect(js).toContain('class Counter {');
+      expect(js).toContain('constructor() {');
+      expect(js).toContain('this.count = 0;');
     });
 
+    it('generates on handlers as methods', () => {
+      const js = generate(`
+        actor Counter {
+          state count: i32 = 0
+
+          on Increment() {
+            count += 1;
+          }
+
+          on Add(n: i32) {
+            count += n;
+          }
+        }
+      `);
+      expect(js).toContain('class Counter {');
+      expect(js).toContain('onIncrement() {');
+      expect(js).toContain('onAdd(n) {');
+    });
+
+    it('generates multiple state fields', () => {
+      const js = generate(`
+        actor Worker {
+          state id: u64 = 0
+          state tasks_completed: u64 = 0
+        }
+      `);
+      expect(js).toContain('this.id = 0;');
+      expect(js).toContain('this.tasks_completed = 0;');
+    });
+
+    it('generates state without initializer as undefined', () => {
+      const js = generate(`
+        actor Worker {
+          state name: String
+        }
+      `);
+      expect(js).toContain('this.name = undefined;');
+    });
+
+    it('generates regular functions as methods', () => {
+      const js = generate(`
+        actor ChatRoom {
+          state members: i32 = 0
+
+          fn broadcast(msg: String) {
+            let x = msg;
+          }
+        }
+      `);
+      expect(js).toContain('broadcast(msg) {');
+      expect(js).toContain('const x = msg;');
+    });
+
+    it('generates public actor with export', () => {
+      const js = generate(`
+        pub actor Service {
+          state running: bool = true
+        }
+      `);
+      expect(js).toContain('export class Service {');
+    });
+
+    it('generates supervise declarations as comments', () => {
+      const js = generate(`
+        actor Application {
+          supervise Worker { restart: .always }
+        }
+      `);
+      expect(js).toContain('/* supervise Worker */');
+    });
+
+    it('generates actor with annotations', () => {
+      const js = generate(`
+        #[intent(manage chat messages)]
+        actor ChatRoom {
+          state count: i32 = 0
+        }
+      `);
+      expect(js).toContain('/* @intent(manage chat messages) */');
+      expect(js).toContain('class ChatRoom {');
+    });
+  });
+
+  // ─── 15b. Contract/Server stubs ────────────────────────────────────
+
+  describe('stub declarations', () => {
     it('emits comment for contract declaration', () => {
       const js = generate(`
         contract Token {

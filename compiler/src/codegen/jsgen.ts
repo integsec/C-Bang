@@ -172,7 +172,68 @@ export class JsGenerator {
   }
 
   private emitActorDecl(decl: ActorDecl): void {
-    this.writeLine(`/* actor ${decl.name} not yet supported */`);
+    this.emitAnnotationsAsComments(decl.annotations);
+    const exportPrefix = decl.visibility === 'public' ? 'export ' : '';
+
+    // Separate member types
+    const stateMembers = decl.members.filter(m => m.kind === 'StateDecl') as StateDecl[];
+    const onHandlers = decl.members.filter(m => m.kind === 'OnHandler') as import('../ast/index.js').OnHandler[];
+    const functions = decl.members.filter(m => m.kind === 'FunctionDecl') as FunctionDecl[];
+    const initDecl = decl.members.find(m => m.kind === 'InitDecl') as import('../ast/index.js').InitDecl | undefined;
+    const superviseDecls = decl.members.filter(m => m.kind === 'SuperviseDecl') as import('../ast/index.js').SuperviseDecl[];
+
+    this.writeLine(`${exportPrefix}class ${decl.name} {`);
+    this.indentInc();
+
+    // Constructor — initialize state fields
+    if (stateMembers.length > 0 || initDecl) {
+      const initParams = initDecl ? initDecl.params.map(p => p.name).join(', ') : '';
+      this.writeLine(`constructor(${initParams}) {`);
+      this.indentInc();
+      for (const s of stateMembers) {
+        if (s.initializer) {
+          this.writeLine(`this.${s.name} = ${this.exprToString(s.initializer)};`);
+        } else {
+          this.writeLine(`this.${s.name} = undefined;`);
+        }
+      }
+      if (initDecl) {
+        for (const stmt of initDecl.body.statements) {
+          this.emitStmt(stmt);
+        }
+      }
+      this.indentDec();
+      this.writeLine('}');
+    }
+
+    // On handlers → methods
+    for (const handler of onHandlers) {
+      this.writeLine('');
+      const params = handler.params.map(p => p.name).join(', ');
+      this.writeLine(`on${handler.messageName}(${params}) {`);
+      this.emitBlockBody(handler.body);
+      this.writeLine('}');
+    }
+
+    // Regular functions → methods
+    for (const fn of functions) {
+      this.writeLine('');
+      this.emitAnnotationsAsComments(fn.annotations);
+      const asyncPrefix = fn.isAsync ? 'async ' : '';
+      const params = fn.params.map(p => p.name).join(', ');
+      this.writeLine(`${asyncPrefix}${fn.name}(${params}) {`);
+      this.emitBlockBody(fn.body);
+      this.writeLine('}');
+    }
+
+    // Supervise declarations → comments
+    for (const sup of superviseDecls) {
+      this.writeLine('');
+      this.writeLine(`/* supervise ${sup.childName} */`);
+    }
+
+    this.indentDec();
+    this.writeLine('}');
   }
 
   private emitContractDecl(decl: ContractDecl): void {
