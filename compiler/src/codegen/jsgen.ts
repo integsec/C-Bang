@@ -237,33 +237,137 @@ export class JsGenerator {
   }
 
   private emitContractDecl(decl: ContractDecl): void {
-    this.writeLine(`/* contract ${decl.name} not yet supported */`);
+    this.emitAnnotationsAsComments(decl.annotations);
+    const exportPrefix = decl.visibility === 'public' ? 'export ' : '';
+
+    const stateMembers = decl.members.filter(m => m.kind === 'StateDecl') as StateDecl[];
+    const functions = decl.members.filter(m => m.kind === 'FunctionDecl') as FunctionDecl[];
+    const initDecl = decl.members.find(m => m.kind === 'InitDecl') as import('../ast/index.js').InitDecl | undefined;
+
+    this.writeLine(`${exportPrefix}class ${decl.name} {`);
+    this.indentInc();
+
+    // Interfaces metadata
+    if (decl.interfaces.length > 0) {
+      this.writeLine(`static __interfaces = [${decl.interfaces.map(i => `"${i}"`).join(', ')}];`);
+      this.writeLine('');
+    }
+
+    // Constructor — initialize state and run init block
+    const initParams = initDecl ? initDecl.params.map(p => p.name).join(', ') : '';
+    this.writeLine(`constructor(${initParams}) {`);
+    this.indentInc();
+    for (const s of stateMembers) {
+      if (s.initializer) {
+        this.writeLine(`this.${s.name} = ${this.exprToString(s.initializer)};`);
+      } else {
+        this.writeLine(`this.${s.name} = undefined;`);
+      }
+    }
+    if (initDecl) {
+      for (const stmt of initDecl.body.statements) {
+        this.emitStmt(stmt);
+      }
+    }
+    this.indentDec();
+    this.writeLine('}');
+
+    // Functions → methods
+    for (const fn of functions) {
+      this.writeLine('');
+      this.emitAnnotationsAsComments(fn.annotations);
+      const asyncPrefix = fn.isAsync ? 'async ' : '';
+      const params = fn.params.map(p => p.name).join(', ');
+      this.writeLine(`${asyncPrefix}${fn.name}(${params}) {`);
+      this.emitBlockBody(fn.body);
+      this.writeLine('}');
+    }
+
+    this.indentDec();
+    this.writeLine('}');
   }
 
   private emitServerDecl(decl: ServerDecl): void {
-    this.writeLine(`/* server ${decl.name} not yet supported */`);
+    this.emitAnnotationsAsComments(decl.annotations);
+    const exportPrefix = decl.visibility === 'public' ? 'export ' : '';
+
+    const stateMembers = decl.members.filter(m => m.kind === 'StateDecl') as StateDecl[];
+    const functions = decl.members.filter(m => m.kind === 'FunctionDecl') as FunctionDecl[];
+    const fieldAssignments = decl.members.filter(m => m.kind === 'FieldAssignment') as import('../ast/index.js').FieldAssignment[];
+
+    this.writeLine(`${exportPrefix}class ${decl.name} {`);
+    this.indentInc();
+
+    // Constructor — initialize config fields and state
+    this.writeLine(`constructor() {`);
+    this.indentInc();
+    for (const f of fieldAssignments) {
+      this.writeLine(`this.${f.name} = ${this.exprToString(f.value)};`);
+    }
+    for (const s of stateMembers) {
+      if (s.initializer) {
+        this.writeLine(`this.${s.name} = ${this.exprToString(s.initializer)};`);
+      } else {
+        this.writeLine(`this.${s.name} = undefined;`);
+      }
+    }
+    this.indentDec();
+    this.writeLine('}');
+
+    // Route handlers → methods
+    for (const fn of functions) {
+      this.writeLine('');
+      this.emitAnnotationsAsComments(fn.annotations);
+      const asyncPrefix = fn.isAsync ? 'async ' : '';
+      const params = fn.params.map(p => p.name).join(', ');
+      this.writeLine(`${asyncPrefix}${fn.name}(${params}) {`);
+      this.emitBlockBody(fn.body);
+      this.writeLine('}');
+    }
+
+    this.indentDec();
+    this.writeLine('}');
   }
 
   private emitComponentDecl(decl: ComponentDecl): void {
-    this.writeLine(`/* component ${decl.name} not yet supported */`);
+    this.emitAnnotationsAsComments(decl.annotations);
+    const exportPrefix = decl.visibility === 'public' ? 'export ' : '';
+    const params = decl.params.map(p => p.name).join(', ');
+
+    // Components compile to render functions
+    this.writeLine(`${exportPrefix}function ${decl.name}(${params}) {`);
+    this.emitBlockBody(decl.body);
+    this.writeLine('}');
   }
 
   private emitUseDecl(decl: UseDecl): void {
-    const path = decl.path.join('/');
+    const modulePath = `./${decl.path.join('/')}.js`;
     if (decl.isWildcard) {
-      this.writeLine(`/* use ${path}::* */`);
+      this.writeLine(`import * from "${modulePath}";`);
       return;
     }
-    for (const item of decl.items) {
-      if (item.kind === 'Named') {
-        const alias = item.alias ? ` as ${item.alias}` : '';
-        this.writeLine(`/* use ${path}::${item.name}${alias} */`);
-      }
-    }
+    const namedItems = decl.items
+      .filter((item): item is Extract<typeof item, { kind: 'Named' }> => item.kind === 'Named');
+    if (namedItems.length === 0) return;
+    const specifiers = namedItems
+      .map(item => item.alias ? `${item.name} as ${item.alias}` : item.name)
+      .join(', ');
+    this.writeLine(`import { ${specifiers} } from "${modulePath}";`);
   }
 
   private emitModDecl(decl: ModDecl): void {
-    this.writeLine(`/* mod ${decl.name} */`);
+    if (decl.body && decl.body.length > 0) {
+      this.writeLine(`const ${decl.name} = (() => {`);
+      this.indentInc();
+      for (const item of decl.body) {
+        this.emitTopLevel(item);
+      }
+      this.indentDec();
+      this.writeLine('})();');
+    } else {
+      // External module reference — will be loaded at runtime
+      this.writeLine(`/* mod ${decl.name} (external) */`);
+    }
   }
 
   private emitStateDecl(decl: StateDecl): void {
@@ -307,17 +411,17 @@ export class JsGenerator {
         break;
       case 'EmitStmt': {
         const args = stmt.args.map(a => this.exprToString(a)).join(', ');
-        this.writeLine(`/* emit ${stmt.eventName}(${args}) */`);
+        this.writeLine(`this.emit("${stmt.eventName}", ${args});`);
         break;
       }
       case 'SpawnStmt': {
         const args = stmt.args.map(a => this.exprToString(a)).join(', ');
-        this.writeLine(`/* spawn ${stmt.actor}(${args}) */`);
+        this.writeLine(`const __actor = new ${stmt.actor}(${args});`);
         break;
       }
       case 'DeployStmt': {
         const args = stmt.args.map(a => this.exprToString(a.value)).join(', ');
-        this.writeLine(`/* deploy ${stmt.contract}(${args}) */`);
+        this.writeLine(`const __contract = new ${stmt.contract}(${args});`);
         break;
       }
     }

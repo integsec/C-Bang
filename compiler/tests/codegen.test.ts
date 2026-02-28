@@ -544,25 +544,274 @@ function early_exit() {
     });
   });
 
-  // ─── 15b. Contract/Server stubs ────────────────────────────────────
+  // ─── 15b. Contract declarations ────────────────────────────────────
 
-  describe('stub declarations', () => {
-    it('emits comment for contract declaration', () => {
+  describe('contract declarations', () => {
+    it('generates class with state in constructor', () => {
       const js = generate(`
         contract Token {
           state supply: u256 = 0
         }
       `);
-      expect(js).toContain('/* contract Token not yet supported */');
+      expect(js).toContain('class Token {');
+      expect(js).toContain('constructor() {');
+      expect(js).toContain('this.supply = 0;');
     });
 
-    it('emits comment for server declaration', () => {
+    it('generates contract with init block', () => {
       const js = generate(`
-        server Api {
-          fn handle() {}
+        contract TokenSwap {
+          state token_a: Address
+          state token_b: Address
+
+          init(a: Address, b: Address) {
+            token_a = a;
+            token_b = b;
+          }
         }
       `);
-      expect(js).toContain('/* server Api not yet supported */');
+      expect(js).toContain('class TokenSwap {');
+      expect(js).toContain('constructor(a, b) {');
+      expect(js).toContain('this.token_a = undefined;');
+      expect(js).toContain('this.token_b = undefined;');
+      expect(js).toContain('token_a = a;');
+    });
+
+    it('generates contract functions as methods', () => {
+      const js = generate(`
+        contract Token {
+          state supply: u256 = 0
+
+          pub fn mint(amount: u256) {
+            supply += amount;
+          }
+
+          pub pure fn get_supply() {
+            return supply;
+          }
+        }
+      `);
+      expect(js).toContain('class Token {');
+      expect(js).toContain('mint(amount) {');
+      expect(js).toContain('get_supply() {');
+    });
+
+    it('generates public contract with export', () => {
+      const js = generate(`
+        pub contract Registry {
+          state count: u256 = 0
+        }
+      `);
+      expect(js).toContain('export class Registry {');
+    });
+
+    it('generates contract annotations as comments', () => {
+      const js = generate(`
+        #[intent(manage token supply)]
+        contract Token {
+          state supply: u256 = 0
+        }
+      `);
+      expect(js).toContain('/* @intent(manage token supply) */');
+      expect(js).toContain('class Token {');
+    });
+
+    it('generates function annotations inside contract', () => {
+      const js = generate(`
+        contract Token {
+          state supply: u256 = 0
+
+          #[intent(mint new tokens)]
+          pub fn mint(amount: u256) {
+            supply += amount;
+          }
+        }
+      `);
+      expect(js).toContain('/* @intent(mint new tokens) */');
+      expect(js).toContain('mint(amount) {');
+    });
+  });
+
+  // ─── 15c. Server declarations ─────────────────────────────────────
+
+  describe('server declarations', () => {
+    it('generates class with handler methods', () => {
+      const js = generate(`
+        server Api {
+          fn handle() {
+            let x = 1;
+          }
+        }
+      `);
+      expect(js).toContain('class Api {');
+      expect(js).toContain('handle() {');
+      expect(js).toContain('const x = 1;');
+    });
+
+    it('generates server with state', () => {
+      const js = generate(`
+        server App {
+          state port: u16 = 8080
+
+          fn start() {
+            let running = true;
+          }
+        }
+      `);
+      expect(js).toContain('class App {');
+      expect(js).toContain('this.port = 8080;');
+      expect(js).toContain('start() {');
+    });
+
+    it('generates public server with export', () => {
+      const js = generate(`
+        pub server WebApp {
+          fn index() {
+            return "hello";
+          }
+        }
+      `);
+      expect(js).toContain('export class WebApp {');
+    });
+
+    it('generates server with annotations on handlers', () => {
+      const js = generate(`
+        server Api {
+          #[intent(retrieve user data)]
+          fn get_user(id: String) {
+            let user = id;
+          }
+        }
+      `);
+      expect(js).toContain('/* @intent(retrieve user data) */');
+      expect(js).toContain('get_user(id) {');
+    });
+
+    it('generates server with multiple handlers', () => {
+      const js = generate(`
+        server Api {
+          fn get_users() {
+            return users;
+          }
+
+          fn create_user(body: User) {
+            return body;
+          }
+
+          fn delete_user(id: String) {
+            return id;
+          }
+        }
+      `);
+      expect(js).toContain('get_users() {');
+      expect(js).toContain('create_user(body) {');
+      expect(js).toContain('delete_user(id) {');
+    });
+  });
+
+  // ─── 15d. Component declarations ──────────────────────────────────
+
+  describe('component declarations', () => {
+    it('generates render function from component', () => {
+      const js = generate(`
+        component Greeting(name: String) {
+          let msg = name;
+        }
+      `);
+      expect(js).toContain('function Greeting(name) {');
+      expect(js).toContain('const msg = name;');
+    });
+
+    it('generates public component with export', () => {
+      const js = generate(`
+        pub component Button(label: String) {
+          let text = label;
+        }
+      `);
+      expect(js).toContain('export function Button(label) {');
+    });
+
+    it('generates component with annotations', () => {
+      const js = generate(`
+        #[intent(display user profile)]
+        component UserProfile(user: User) {
+          let name = user;
+        }
+      `);
+      expect(js).toContain('/* @intent(display user profile) */');
+      expect(js).toContain('function UserProfile(user) {');
+    });
+
+    it('generates component with multiple params', () => {
+      const js = generate(`
+        component Card(title: String, content: String, footer: String) {
+          let heading = title;
+        }
+      `);
+      expect(js).toContain('function Card(title, content, footer) {');
+    });
+  });
+
+  // ─── 15e. Spawn/Deploy/Emit statements ────────────────────────────
+
+  describe('spawn, deploy, and emit statements', () => {
+    it('generates spawn as constructor call', () => {
+      const js = generate(`
+        fn main() {
+          spawn Worker(1, 2, 3);
+        }
+      `);
+      expect(js).toContain('const __actor = new Worker(1, 2, 3);');
+    });
+
+    it('generates deploy as function call expression', () => {
+      // deploy is parsed as a Call expression by the parser
+      const js = generate(`
+        fn main() {
+          let token = deploy Token(name: "MyToken");
+        }
+      `);
+      // deploy Token(...) becomes a call with callee "deploy Token"
+      expect(js).toContain('deploy Token("MyToken")');
+    });
+
+    it('generates emit as method call', () => {
+      const js = generate(`
+        contract Token {
+          state supply: u256 = 0
+
+          pub fn mint(amount: u256) {
+            supply += amount;
+            emit Minted(amount);
+          }
+        }
+      `);
+      expect(js).toContain('this.emit("Minted", amount);');
+    });
+  });
+
+  // ─── 15f. Use declarations as imports ─────────────────────────────
+
+  describe('use declarations', () => {
+    it('generates import for named use', () => {
+      const js = generate(`
+        use std::collections::{HashMap}
+      `);
+      expect(js).toContain('import { HashMap } from "./std/collections.js";');
+    });
+
+    it('generates import with alias', () => {
+      const js = generate(`
+        use io::net::{TcpStream as Tcp}
+      `);
+      expect(js).toContain('import { TcpStream as Tcp } from "./io/net.js";');
+    });
+
+    it('generates import for multiple items', () => {
+      const js = generate(`
+        use std::collections::{Vec, Map}
+      `);
+      expect(js).toContain('import { Vec, Map } from "./std/collections.js";');
     });
   });
 
