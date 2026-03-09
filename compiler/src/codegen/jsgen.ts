@@ -237,7 +237,52 @@ export class JsGenerator {
   }
 
   private emitContractDecl(decl: ContractDecl): void {
-    this.writeLine(`/* contract ${decl.name} not yet supported */`);
+    this.emitAnnotationsAsComments(decl.annotations);
+    const exportPrefix = decl.visibility === 'public' ? 'export ' : '';
+
+    const stateMembers = decl.members.filter(m => m.kind === 'StateDecl') as StateDecl[];
+    const functions = decl.members.filter(m => m.kind === 'FunctionDecl') as FunctionDecl[];
+    const initDecl = decl.members.find(m => m.kind === 'InitDecl') as import('../ast/index.js').InitDecl | undefined;
+
+    if (decl.interfaces.length > 0) {
+      this.writeLine(`/* implements ${decl.interfaces.join(', ')} */`);
+    }
+
+    this.writeLine(`${exportPrefix}class ${decl.name} {`);
+    this.indentInc();
+
+    if (stateMembers.length > 0 || initDecl) {
+      const initParams = initDecl ? initDecl.params.map(p => p.name).join(', ') : '';
+      this.writeLine(`constructor(${initParams}) {`);
+      this.indentInc();
+      for (const s of stateMembers) {
+        if (s.initializer) {
+          this.writeLine(`this.${s.name} = ${this.exprToString(s.initializer)};`);
+        } else {
+          this.writeLine(`this.${s.name} = undefined;`);
+        }
+      }
+      if (initDecl) {
+        for (const stmt of initDecl.body.statements) {
+          this.emitStmt(stmt);
+        }
+      }
+      this.indentDec();
+      this.writeLine('}');
+    }
+
+    for (const fn of functions) {
+      this.writeLine('');
+      this.emitAnnotationsAsComments(fn.annotations);
+      const asyncPrefix = fn.isAsync ? 'async ' : '';
+      const params = fn.params.map(p => p.name).join(', ');
+      this.writeLine(`${asyncPrefix}${fn.name}(${params}) {`);
+      this.emitBlockBody(fn.body);
+      this.writeLine('}');
+    }
+
+    this.indentDec();
+    this.writeLine('}');
   }
 
   private emitServerDecl(decl: ServerDecl): void {

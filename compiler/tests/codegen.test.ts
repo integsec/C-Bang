@@ -587,18 +587,69 @@ function early_exit() {
     });
   });
 
-  // ─── 15b. Contract/Server stubs ────────────────────────────────────
+  // ─── 15b. Contract declarations ────────────────────────────────────
 
-  describe('stub declarations', () => {
-    it('emits comment for contract declaration', () => {
+  describe('contract declarations', () => {
+    it('generates contract as a class with state', () => {
       const js = generate(`
         contract Token {
           state supply: u256 = 0
         }
       `);
-      expect(js).toContain('/* contract Token not yet supported */');
+      expect(js).toContain('class Token {');
+      expect(js).toContain('constructor() {');
+      expect(js).toContain('this.supply = 0;');
     });
 
+    it('generates contract with init as constructor', () => {
+      const js = generate(`
+        contract Token {
+          state owner: Address
+
+          init() {
+            owner = caller;
+          }
+        }
+      `);
+      expect(js).toContain('class Token {');
+      expect(js).toContain('constructor() {');
+      expect(js).toContain('this.owner = undefined;');
+      expect(js).toContain('owner = caller;');
+    });
+
+    it('generates contract functions as methods', () => {
+      const js = generate(`
+        contract Token {
+          state supply: u256 = 0
+
+          pub fn mint(amount: u256) {
+            supply += amount;
+          }
+        }
+      `);
+      expect(js).toContain('mint(amount) {');
+      expect(js).toContain('supply += amount;');
+    });
+
+    it('generates public contract with export', () => {
+      const js = generate(`
+        pub contract Registry {
+          state count: u256 = 0
+        }
+      `);
+      expect(js).toContain('export class Registry {');
+    });
+
+    it('generates contract with annotations', () => {
+      const js = generate(`
+        #[intent(manage token supply)]
+        contract Token {
+          state supply: u256 = 0
+        }
+      `);
+      expect(js).toContain('/* @intent(manage token supply) */');
+      expect(js).toContain('class Token {');
+    });
   });
 
   // ─── Server declarations ─────────────────────────────────────────
