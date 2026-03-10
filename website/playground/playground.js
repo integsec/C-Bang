@@ -394,7 +394,8 @@ function run() {
 
   // Execute in a sandboxed iframe via Blob URL to avoid needing unsafe-eval.
   // The iframe posts console output back to us via postMessage.
-  var iframeHtml = '<!DOCTYPE html><html><head><script>' +
+  var iframeHtml = '<!DOCTYPE html><html><head></head>' +
+    '<body style="margin:0;padding:0;background:#0a0a2e;"><script>' +
     'var __canvas = document.createElement("canvas"); __canvas.id = "c"; __canvas.width = 400; __canvas.height = 400; document.body.appendChild(__canvas);' +
     'var __ctx = __canvas.getContext("2d");' +
     'var __logs = [];' +
@@ -408,7 +409,7 @@ function run() {
     '  var __canvasData2 = null; try { __canvasData2 = __canvas.toDataURL("image/png"); } catch(ce) {}' +
     '  parent.postMessage({ type: "cbang-output", logs: __logs, error: e.message, canvasData: __canvasData2 }, "*");' +
     '}' +
-    '<\/script></head><body style="margin:0;padding:0;background:#0a0a2e;"></body></html>';
+    '<\/script></body></html>';
 
   var blob = new Blob([iframeHtml], { type: 'text/html' });
   var url = URL.createObjectURL(blob);
