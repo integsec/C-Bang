@@ -130,6 +130,11 @@ body {
   background: #4caf50;
 }
 
+.pg-run-btn:disabled {
+  background: var(--text-muted);
+  cursor: wait;
+}
+
 .pg-run-btn .play-icon {
   font-size: 0.7rem;
 }

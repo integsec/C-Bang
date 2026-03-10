@@ -368,6 +368,21 @@ function run() {
   consoleOutput.className = 'pg-output';
   consoleOutput.textContent = 'Running...';
 
+  // Show running indicator on the Run button
+  var runBtn = document.getElementById('run-btn');
+  runBtn.disabled = true;
+  runBtn.textContent = 'Running...';
+
+  function resetRunBtn() {
+    runBtn.disabled = false;
+    runBtn.textContent = '';
+    var icon = document.createElement('span');
+    icon.className = 'play-icon';
+    icon.textContent = '\u25B6';
+    runBtn.appendChild(icon);
+    runBtn.appendChild(document.createTextNode(' Run'));
+  }
+
   var execCode = result.js;
   // Auto-call main() if defined
   if (execCode.indexOf('function main(') !== -1) {
@@ -414,15 +429,18 @@ function run() {
     window.removeEventListener('message', onMessage);
     consoleOutput.textContent = '(timeout — program took too long)';
     consoleOutput.className = 'pg-output error';
+    resetRunBtn();
     iframe.remove();
     URL.revokeObjectURL(url);
-  }, 5000);
+  }, 15000);
 
   function onMessage(e) {
-    // Only accept messages from our sandboxed iframe (origin is 'null' for
-    // sandbox iframes loaded via blob: URLs).
-    if (e.source !== iframe.contentWindow) return;
+    // Only accept messages with our specific type marker. The sandboxed iframe
+    // (allow-scripts only, no allow-same-origin) has origin "null" and cannot
+    // access the parent DOM. We check e.source when accessible for defense in
+    // depth, but some browsers return null for cross-origin contentWindow.
     if (!e.data || e.data.type !== 'cbang-output') return;
+    if (iframe.contentWindow && e.source !== iframe.contentWindow) return;
 
     clearTimeout(timeout);
     window.removeEventListener('message', onMessage);
@@ -446,6 +464,7 @@ function run() {
       canvasPanel.style.display = 'none';
     }
 
+    resetRunBtn();
     iframe.remove();
     URL.revokeObjectURL(url);
   }
