@@ -33,12 +33,22 @@ export class JsGenerator {
   private output: string = '';
   private indent: number = 0;
   private classStateFields: Set<string> = new Set();
+  private classNames: Set<string> = new Set();
 
   // ─── Main entry point ─────────────────────────────────────────────
 
   generate(program: Program): string {
     this.output = '';
     this.indent = 0;
+    this.classNames = new Set();
+
+    // Pre-pass: collect names of class-like declarations
+    for (const item of program.items) {
+      if (item.kind === 'ActorDecl' || item.kind === 'ContractDecl' ||
+          item.kind === 'ServerDecl' || item.kind === 'ComponentDecl') {
+        this.classNames.add(item.name);
+      }
+    }
 
     for (let i = 0; i < program.items.length; i++) {
       this.emitTopLevel(program.items[i]!);
@@ -678,7 +688,8 @@ export class JsGenerator {
   private callToString(expr: import('../ast/index.js').CallExpr): string {
     const callee = this.exprToString(expr.callee);
     const args = expr.args.map(a => this.exprToString(a.value)).join(', ');
-    return `${callee}(${args})`;
+    const prefix = this.classNames.has(callee) ? 'new ' : '';
+    return `${prefix}${callee}(${args})`;
   }
 
   private structExprToString(expr: import('../ast/index.js').StructExpr): string {

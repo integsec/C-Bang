@@ -3885,11 +3885,18 @@ var CBang = (() => {
       __publicField(this, "output", "");
       __publicField(this, "indent", 0);
       __publicField(this, "classStateFields", /* @__PURE__ */ new Set());
+      __publicField(this, "classNames", /* @__PURE__ */ new Set());
     }
     // ─── Main entry point ─────────────────────────────────────────────
     generate(program) {
       this.output = "";
       this.indent = 0;
+      this.classNames = /* @__PURE__ */ new Set();
+      for (const item of program.items) {
+        if (item.kind === "ActorDecl" || item.kind === "ContractDecl" || item.kind === "ServerDecl" || item.kind === "ComponentDecl") {
+          this.classNames.add(item.name);
+        }
+      }
       for (let i = 0; i < program.items.length; i++) {
         this.emitTopLevel(program.items[i]);
         if (i < program.items.length - 1) {
@@ -4467,7 +4474,8 @@ var CBang = (() => {
     callToString(expr) {
       const callee = this.exprToString(expr.callee);
       const args = expr.args.map((a) => this.exprToString(a.value)).join(", ");
-      return `${callee}(${args})`;
+      const prefix = this.classNames.has(callee) ? "new " : "";
+      return `${prefix}${callee}(${args})`;
     }
     structExprToString(expr) {
       if (expr.fields.length === 0) {
