@@ -357,6 +357,78 @@ fn main() with IO {
     canvas_animate!(frame);
 }`,
 
+  mandelbrot: `// Mandelbrot Fractal — pure computation meets canvas rendering
+// Demonstrates: nested while loops, pure functions, intents, string interpolation
+
+#[intent("compute Mandelbrot escape iteration for complex point (cr, ci)")]
+pure fn mandelbrot(cr: f64, ci: f64) -> f64 {
+    let mut zr = 0.0;
+    let mut zi = 0.0;
+    let mut i = 0.0;
+    let mut esc = 80.0;
+    while i < 80.0 {
+        let tr = zr * zr - zi * zi + cr;
+        zi = 2.0 * zr * zi + ci;
+        zr = tr;
+        if zr * zr + zi * zi > 4.0 {
+            if esc > 79.0 {
+                esc = i;
+            }
+        }
+        i = i + 1.0;
+    }
+    return esc;
+}
+
+#[intent("map iteration count to a red color component")]
+pure fn col_r(n: f64) -> f64 {
+    return math_floor!(127.0 + 127.0 * math_sin!(n * 0.12));
+}
+
+#[intent("map iteration count to a green color component")]
+pure fn col_g(n: f64) -> f64 {
+    return math_floor!(127.0 + 127.0 * math_sin!(n * 0.12 + 2.094));
+}
+
+#[intent("map iteration count to a blue color component")]
+pure fn col_b(n: f64) -> f64 {
+    return math_floor!(127.0 + 127.0 * math_sin!(n * 0.12 + 4.189));
+}
+
+fn main() with IO {
+    canvas_size!(400, 400);
+    println!("Rendering Mandelbrot fractal...");
+
+    let mut py = 0.0;
+    while py < 100.0 {
+        let mut px = 0.0;
+        while px < 100.0 {
+            let cr = (px - 65.0) / 35.0;
+            let ci = (py - 50.0) / 35.0;
+            let n = mandelbrot(cr, ci);
+            if n < 79.0 {
+                let r = col_r(n);
+                let g = col_g(n);
+                let b = col_b(n);
+                canvas_fill_style!("rgb({r},{g},{b})");
+            } else {
+                canvas_fill_style!("#000000");
+            }
+            canvas_fill_rect!(px * 4.0, py * 4.0, 4.0, 4.0);
+            px = px + 1.0;
+        }
+        py = py + 1.0;
+    }
+
+    canvas_font!("16px monospace");
+    canvas_fill_style!("#ffffff");
+    canvas_text!("C! Mandelbrot", 140.0, 25.0);
+    canvas_font!("11px monospace");
+    canvas_fill_style!("#888888");
+    canvas_text!("pure fn + nested while loops + 80 iterations/pixel", 52.0, 390.0);
+    println!("Mandelbrot fractal rendered — 10,000 pixels, 80 iterations each!");
+}`,
+
   spinning: `// 3D Spinning Cube — animated canvas with starfield
 // Demonstrates: state, canvas_animate!, math builtins, intents
 
