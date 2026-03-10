@@ -411,6 +411,7 @@ function run() {
 
   // Listen for result
   var timeout = setTimeout(function () {
+    window.removeEventListener('message', onMessage);
     consoleOutput.textContent = '(timeout — program took too long)';
     consoleOutput.className = 'pg-output error';
     iframe.remove();
@@ -418,31 +419,35 @@ function run() {
   }, 5000);
 
   function onMessage(e) {
-    if (e.data && e.data.type === 'cbang-output') {
-      clearTimeout(timeout);
-      window.removeEventListener('message', onMessage);
-      var logText = e.data.logs.join('\n');
-      if (e.data.error) {
-        consoleOutput.textContent = (logText ? logText + '\n' : '') + 'Runtime error: ' + e.data.error;
-        consoleOutput.className = 'pg-output error';
-      } else {
-        consoleOutput.textContent = logText || '(no output)';
-        consoleOutput.className = 'pg-output success';
-      }
+    // Only accept messages from our sandboxed iframe (origin is 'null' for
+    // sandbox iframes loaded via blob: URLs).
+    if (e.source !== iframe.contentWindow) return;
+    if (!e.data || e.data.type !== 'cbang-output') return;
 
-      // Show canvas output if available
-      var canvasPanel = document.getElementById('canvas-panel');
-      var canvasImg = document.getElementById('canvas-img');
-      if (e.data.canvasData && usesCanvas) {
-        canvasImg.src = e.data.canvasData;
-        canvasPanel.style.display = 'flex';
-      } else {
-        canvasPanel.style.display = 'none';
-      }
-
-      iframe.remove();
-      URL.revokeObjectURL(url);
+    clearTimeout(timeout);
+    window.removeEventListener('message', onMessage);
+    var logText = (Array.isArray(e.data.logs) ? e.data.logs : []).join('\n');
+    if (e.data.error) {
+      consoleOutput.textContent = (logText ? logText + '\n' : '') + 'Runtime error: ' + String(e.data.error);
+      consoleOutput.className = 'pg-output error';
+    } else {
+      consoleOutput.textContent = logText || '(no output)';
+      consoleOutput.className = 'pg-output success';
     }
+
+    // Show canvas output if available — only accept data: URIs
+    var canvasPanel = document.getElementById('canvas-panel');
+    var canvasImg = document.getElementById('canvas-img');
+    var canvasData = e.data.canvasData;
+    if (usesCanvas && typeof canvasData === 'string' && canvasData.indexOf('data:image/') === 0) {
+      canvasImg.src = canvasData;
+      canvasPanel.style.display = 'flex';
+    } else {
+      canvasPanel.style.display = 'none';
+    }
+
+    iframe.remove();
+    URL.revokeObjectURL(url);
   }
   window.addEventListener('message', onMessage);
 }
