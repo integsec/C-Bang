@@ -3884,6 +3884,7 @@ var CBang = (() => {
     constructor() {
       __publicField(this, "output", "");
       __publicField(this, "indent", 0);
+      __publicField(this, "classStateFields", /* @__PURE__ */ new Set());
     }
     // ─── Main entry point ─────────────────────────────────────────────
     generate(program) {
@@ -4035,6 +4036,7 @@ var CBang = (() => {
         this.indentDec();
         this.writeLine("}");
       }
+      this.classStateFields = new Set(stateMembers.map((s) => s.name));
       for (const handler of onHandlers) {
         this.writeLine("");
         const params = handler.params.map((p) => p.name).join(", ");
@@ -4055,6 +4057,7 @@ var CBang = (() => {
         this.writeLine("");
         this.writeLine(`/* supervise ${sup.childName} */`);
       }
+      this.classStateFields = /* @__PURE__ */ new Set();
       this.indentDec();
       this.writeLine("}");
     }
@@ -4088,6 +4091,7 @@ var CBang = (() => {
         this.indentDec();
         this.writeLine("}");
       }
+      this.classStateFields = new Set(stateMembers.map((s) => s.name));
       for (const fn of functions) {
         this.writeLine("");
         this.emitAnnotationsAsComments(fn.annotations);
@@ -4097,6 +4101,7 @@ var CBang = (() => {
         this.emitBlockBody(fn.body);
         this.writeLine("}");
       }
+      this.classStateFields = /* @__PURE__ */ new Set();
       this.indentDec();
       this.writeLine("}");
     }
@@ -4324,6 +4329,7 @@ var CBang = (() => {
         case "BoolLiteral":
           return expr.value ? "true" : "false";
         case "Ident":
+          if (this.classStateFields.has(expr.name)) return `this.${expr.name}`;
           return expr.name;
         case "Binary":
           return this.binaryToString(expr);

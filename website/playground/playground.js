@@ -58,8 +58,19 @@ actor Counter {
 }
 
 fn main() with IO {
-    println!("Counter actor: Increment, Reset, GetCount");
-    println!("Intent annotations describe each handler's purpose.");
+    let c = Counter();
+    println!("Created Counter actor");
+
+    c.onIncrement();
+    c.onIncrement();
+    c.onIncrement();
+    println!("After 3 increments: count = {c.onGetCount()}");
+
+    c.onReset();
+    println!("After reset: count = {c.onGetCount()}");
+
+    c.onIncrement();
+    println!("After 1 more increment: count = {c.onGetCount()}");
 }`,
 
   pattern: `// Pattern Matching — enums and exhaustive matching
@@ -87,7 +98,7 @@ pure fn describe(s: Shape) -> String {
 }`,
 
   chat: `// Chat Application — actors for real-time messaging
-// Demonstrates: actor supervision, intent annotations, effects, emit/reply
+// Demonstrates: multiple actors, intent annotations, emit/reply
 
 type Message {
     sender: String,
@@ -116,31 +127,39 @@ actor ChatRoom {
         emit NewMessage(sender, text, message_count);
     }
 
-    #[intent("return current room statistics")]
+    #[intent("return current member count")]
     on GetStats() {
         reply members;
     }
-}
 
-actor Moderator {
-    state warnings: i32 = 0
-
-    #[intent("filter inappropriate content before delivery")]
-    on Review(sender: String, text: String) {
-        let is_ok = true;
-        if is_ok {
-            emit Approved(sender, text);
-        } else {
-            warnings += 1;
-            emit Rejected(sender, warnings);
-        }
+    #[intent("return total messages sent")]
+    on GetMessageCount() {
+        reply message_count;
     }
 }
 
 fn main() with IO {
-    println!("Chat system compiled successfully!");
-    println!("Every handler has an intent — AI agents can");
-    println!("reason about what each message does.");
+    let room = ChatRoom();
+    println!("=== C! Chat Room ===");
+
+    room.onJoin("Alice");
+    println!("Alice joined  — members: {room.onGetStats()}");
+
+    room.onJoin("Bob");
+    println!("Bob joined    — members: {room.onGetStats()}");
+
+    room.onJoin("Charlie");
+    println!("Charlie joined — members: {room.onGetStats()}");
+
+    room.onSendMessage("Alice", "Hello everyone!");
+    room.onSendMessage("Bob", "Hey Alice!");
+    room.onSendMessage("Charlie", "Great to be here!");
+    println!("Messages sent: {room.onGetMessageCount()}");
+
+    room.onLeave("Charlie");
+    println!("Charlie left  — members: {room.onGetStats()}");
+
+    println!("Final stats: {room.onGetStats()} members, {room.onGetMessageCount()} messages");
 }`,
 
   contract: `// Token Contract — ERC20-style token with minting and transfers
@@ -150,28 +169,27 @@ contract Token {
     state name: String
     state symbol: String
     state total_supply: u256 = 0
-    state owner: Address
 
-    init() {
-        owner = caller;
-        name = "CBangCoin";
-        symbol = "CBC";
-    }
-
-    #[intent("create new tokens, only callable by owner")]
-    pub fn mint(to: Address, amount: u256) {
+    #[intent("create new tokens and increase supply")]
+    pub fn mint(amount: u256) {
         total_supply += amount;
-        emit Transfer(to, amount);
+        emit Minted(amount, total_supply);
     }
 
-    #[intent("transfer tokens between accounts safely")]
-    pub fn transfer(to: Address, amount: u256) {
-        emit Transfer(to, amount);
+    #[intent("burn tokens and decrease supply")]
+    pub fn burn(amount: u256) {
+        total_supply -= amount;
+        emit Burned(amount, total_supply);
     }
 
     #[intent("return the current total token supply")]
     pub fn get_supply() {
         reply total_supply;
+    }
+
+    #[intent("return the token name")]
+    pub fn get_name() {
+        reply name;
     }
 }
 
@@ -185,21 +203,42 @@ contract NFTMarketplace {
         emit ItemListed(token_id, price, listing_count);
     }
 
-    #[intent("purchase a listed NFT, transferring ownership")]
-    pub fn buy_item(listing_id: u256) {
-        emit ItemSold(listing_id, caller);
+    #[intent("return total number of listings")]
+    pub fn get_listings() {
+        reply listing_count;
     }
 
     #[intent("compute marketplace fee for a given price")]
     pub pure fn calculate_fee(price: u256) -> u256 {
-        return price * 2 / 100;
+        return price * fee_percent / 100;
     }
 }
 
 fn main() with IO {
-    println!("Token contract: CBangCoin (CBC)");
-    println!("NFT Marketplace with 2% fee");
-    println!("Contracts compiled to JavaScript classes!");
+    let token = Token();
+    token.name = "CBangCoin";
+    token.symbol = "CBC";
+    println!("=== {token.get_name()} ({token.symbol}) ===");
+
+    token.mint(1000);
+    println!("Minted 1000 tokens — supply: {token.get_supply()}");
+
+    token.mint(500);
+    println!("Minted 500 more   — supply: {token.get_supply()}");
+
+    token.burn(200);
+    println!("Burned 200 tokens — supply: {token.get_supply()}");
+
+    let market = NFTMarketplace();
+    println!("");
+    println!("=== NFT Marketplace ===");
+    market.list_item(1, 100);
+    market.list_item(2, 250);
+    market.list_item(3, 500);
+    println!("Listed 3 NFTs — total listings: {market.get_listings()}");
+
+    let fee = market.calculate_fee(500);
+    println!("Fee on 500 token sale: {fee}");
 }`,
 
   spinning: `// 3D Spinning Cube — animated canvas with starfield

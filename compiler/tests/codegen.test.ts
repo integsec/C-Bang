@@ -945,7 +945,7 @@ function early_exit() {
           }
         }
       `);
-      expect(js).toContain('/* emit CountChanged(count) */');
+      expect(js).toContain('/* emit CountChanged(this.count) */');
     });
   });
 

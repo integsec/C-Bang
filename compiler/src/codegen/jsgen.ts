@@ -32,6 +32,7 @@ import type {
 export class JsGenerator {
   private output: string = '';
   private indent: number = 0;
+  private classStateFields: Set<string> = new Set();
 
   // ─── Main entry point ─────────────────────────────────────────────
 
@@ -206,6 +207,9 @@ export class JsGenerator {
       this.writeLine('}');
     }
 
+    // Track state fields for this. prefixing
+    this.classStateFields = new Set(stateMembers.map(s => s.name));
+
     // On handlers → methods
     for (const handler of onHandlers) {
       this.writeLine('');
@@ -232,6 +236,7 @@ export class JsGenerator {
       this.writeLine(`/* supervise ${sup.childName} */`);
     }
 
+    this.classStateFields = new Set();
     this.indentDec();
     this.writeLine('}');
   }
@@ -271,6 +276,8 @@ export class JsGenerator {
       this.writeLine('}');
     }
 
+    this.classStateFields = new Set(stateMembers.map(s => s.name));
+
     for (const fn of functions) {
       this.writeLine('');
       this.emitAnnotationsAsComments(fn.annotations);
@@ -281,6 +288,7 @@ export class JsGenerator {
       this.writeLine('}');
     }
 
+    this.classStateFields = new Set();
     this.indentDec();
     this.writeLine('}');
   }
@@ -533,6 +541,7 @@ export class JsGenerator {
       case 'BoolLiteral':
         return expr.value ? 'true' : 'false';
       case 'Ident':
+        if (this.classStateFields.has(expr.name)) return `this.${expr.name}`;
         return expr.name;
       case 'Binary':
         return this.binaryToString(expr);
