@@ -110,6 +110,7 @@
                                 <li><a href="#ownership">Ownership &amp; Linear Types</a></li>
                                 <li><a href="#intents">Intent Annotations</a></li>
                                 <li><a href="#building">Building &amp; Running</a></li>
+                                <li><a href="#compile-targets">Compile Targets</a></li>
                                 <li><a href="#next-steps">Next Steps</a></li>
                             </ul>
                         </nav>
@@ -409,6 +410,37 @@
 <span class="cm"># Check without building</span>
 <span class="fn">cb</span> check</pre>
                             </div>
+                        </div>
+
+                        <!-- Compile to Different Targets -->
+                        <h2 id="compile-targets">Compile to Different Targets</h2>
+                        <p>C! supports five compilation targets. Use the <code>--target</code> flag to choose your output format:</p>
+
+                        <div class="code-block">
+                            <div class="code-header">
+                                <div class="code-dots"><span></span><span></span><span></span></div>
+                                <span class="code-filename">terminal</span>
+                            </div>
+                            <div class="code-body">
+<pre><span class="cm"># JavaScript (default)</span>
+<span class="fn">cbang</span> build hello.cb
+
+<span class="cm"># WebAssembly (WASI compatible)</span>
+<span class="fn">cbang</span> build <span class="str">--target wasm</span> hello.cb
+
+<span class="cm"># LLVM IR (compile to native via LLVM)</span>
+<span class="fn">cbang</span> build <span class="str">--target llvm</span> hello.cb
+
+<span class="cm"># EVM bytecode (Ethereum smart contracts)</span>
+<span class="fn">cbang</span> build <span class="str">--target evm</span> contract.cb
+
+<span class="cm"># NEAR WASM (NEAR Protocol contracts)</span>
+<span class="fn">cbang</span> build <span class="str">--target near</span> contract.cb</pre>
+                            </div>
+                        </div>
+
+                        <div class="info-box tip">
+                            <p><strong>Same code, multiple targets.</strong> Your C! source compiles to any target without changes. Shared types across frontend, backend, and smart contracts mean zero schema drift.</p>
                         </div>
 
                         <!-- Next Steps -->

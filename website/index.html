@@ -129,12 +129,12 @@
                         </div>
                         <div class="hero-stats">
                             <div class="hero-stat">
-                                <div class="hero-stat-value"><span class="accent">588</span></div>
+                                <div class="hero-stat-value"><span class="accent">639</span></div>
                                 <div class="hero-stat-label">Tests passing</div>
                             </div>
                             <div class="hero-stat">
-                                <div class="hero-stat-value"><span class="accent">6</span></div>
-                                <div class="hero-stat-label">Compiler passes</div>
+                                <div class="hero-stat-value"><span class="accent">5</span></div>
+                                <div class="hero-stat-label">Codegen targets</div>
                             </div>
                             <div class="hero-stat">
                                 <div class="hero-stat-value"><span class="accent">10</span></div>
@@ -303,27 +303,84 @@
                                 <span>30 tests</span>
                             </div>
                         </div>
-                        <div class="progress-item in-progress">
-                            <span class="progress-status">&#9881;</span>
+                        <div class="progress-item done">
+                            <span class="progress-status">&#10003;</span>
                             <div>
                                 <strong>JS Codegen</strong>
                                 <span>74 tests</span>
                             </div>
                         </div>
-                        <div class="progress-item upcoming">
-                            <span class="progress-status">&#9744;</span>
+                        <div class="progress-item done">
+                            <span class="progress-status">&#10003;</span>
                             <div>
                                 <strong>WASM Codegen</strong>
-                                <span>20 tests</span>
+                                <span>62 tests</span>
                             </div>
                         </div>
-                        <div class="progress-item upcoming">
-                            <span class="progress-status">&#9744;</span>
+                        <div class="progress-item done">
+                            <span class="progress-status">&#10003;</span>
                             <div>
-                                <strong>LLVM Backend</strong>
-                                <span>Planned</span>
+                                <strong>LLVM IR Codegen</strong>
+                                <span>56 tests</span>
                             </div>
                         </div>
+                        <div class="progress-item done">
+                            <span class="progress-status">&#10003;</span>
+                            <div>
+                                <strong>EVM Codegen</strong>
+                                <span>54 tests</span>
+                            </div>
+                        </div>
+                        <div class="progress-item done">
+                            <span class="progress-status">&#10003;</span>
+                            <div>
+                                <strong>NEAR Codegen</strong>
+                                <span>40 tests</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Multi-Target Compilation Section -->
+        <section class="section" id="targets" aria-labelledby="targets-heading">
+            <div class="container">
+                <div class="section-header animate-on-scroll">
+                    <span class="section-label">Multi-Target Compilation</span>
+                    <h2 id="targets-heading">One codebase, five deployment targets</h2>
+                    <p>Write your application once in C! and compile to any target. From web apps to smart contracts, all from a single language with shared types.</p>
+                </div>
+                <div class="targets-grid animate-on-scroll">
+                    <div class="target-card">
+                        <div class="target-icon">JS</div>
+                        <h3>JavaScript</h3>
+                        <p>Run anywhere with Node.js or browsers. Full ES module output with source maps.</p>
+                        <code>cbang build hello.cb</code>
+                    </div>
+                    <div class="target-card">
+                        <div class="target-icon">WASM</div>
+                        <h3>WebAssembly</h3>
+                        <p>Near-native speed with WASI compatibility. Deploy to browsers, edge, and serverless.</p>
+                        <code>cbang build --target wasm hello.cb</code>
+                    </div>
+                    <div class="target-card">
+                        <div class="target-icon">LLVM</div>
+                        <h3>LLVM IR</h3>
+                        <p>Compile to native binaries via LLVM. Maximum performance for servers and CLI tools.</p>
+                        <code>cbang build --target llvm hello.cb</code>
+                    </div>
+                    <div class="target-card">
+                        <div class="target-icon">EVM</div>
+                        <h3>Ethereum (EVM)</h3>
+                        <p>Deploy smart contracts to Ethereum and EVM-compatible chains. ABI generated automatically.</p>
+                        <code>cbang build --target evm contract.cb</code>
+                    </div>
+                    <div class="target-card">
+                        <div class="target-icon">NEAR</div>
+                        <h3>NEAR Protocol</h3>
+                        <p>Deploy to NEAR blockchain with cross-contract calls, storage, and event support.</p>
+                        <code>cbang build --target near contract.cb</code>
                     </div>
                 </div>
             </div>

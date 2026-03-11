@@ -142,6 +142,7 @@
                                 <li><a href="#intent-annotations">Intent Annotations</a></li>
                                 <li><a href="#actors">Actor Model</a></li>
                                 <li><a href="#deployment">Deployment</a></li>
+                                <li><a href="#build-targets">Build Targets</a></li>
                                 <li><a href="#smart-contracts">Smart Contracts</a></li>
                                 <li><a href="#stdlib">Standard Library</a></li>
                             </ul>
@@ -304,6 +305,57 @@
 
                         <div class="info-box note">
                             <p><strong>Full-stack shared types:</strong> Your <code>User</code> type defined once is used identically in your backend API handler, your frontend WASM component, and your on-chain contract. No serialization bugs, no schema drift.</p>
+                        </div>
+
+                        <!-- Build Targets -->
+                        <h2 id="build-targets">Build Targets</h2>
+                        <p>The C! compiler supports five output targets via the <code>cbang build --target &lt;target&gt;</code> command. Each target is fully implemented with dedicated code generation.</p>
+
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Target</th>
+                                    <th>Command</th>
+                                    <th>Output</th>
+                                    <th>Use Case</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>JavaScript</strong></td>
+                                    <td><code>cbang build hello.cb</code></td>
+                                    <td><code>.js</code></td>
+                                    <td>Web apps, Node.js servers, browser scripts</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>WebAssembly</strong></td>
+                                    <td><code>cbang build --target wasm hello.cb</code></td>
+                                    <td><code>.wasm</code></td>
+                                    <td>Near-native performance, WASI compatible</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>LLVM IR</strong></td>
+                                    <td><code>cbang build --target llvm hello.cb</code></td>
+                                    <td><code>.ll</code></td>
+                                    <td>Native binaries via LLVM toolchain</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>EVM</strong></td>
+                                    <td><code>cbang build --target evm contract.cb</code></td>
+                                    <td><code>.hex</code> + <code>.abi.json</code></td>
+                                    <td>Ethereum smart contracts</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>NEAR</strong></td>
+                                    <td><code>cbang build --target near contract.cb</code></td>
+                                    <td><code>.near.wasm</code></td>
+                                    <td>NEAR Protocol smart contracts</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div class="info-box tip">
+                            <p><strong>Default target:</strong> When no <code>--target</code> flag is specified, C! compiles to JavaScript. This is the recommended target for development and the browser playground.</p>
                         </div>
 
                         <!-- Smart Contracts -->
