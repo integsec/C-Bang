@@ -5,7 +5,7 @@
  * Uses WASI preview1 for I/O (fd_write to stdout).
  *
  * Currently supports:
- *   - Integer arithmetic (i32, i64)
+ *   - Integer arithmetic (i32, i64) and floating-point (f64)
  *   - Function declarations and calls
  *   - Let bindings and assignments
  *   - If/else control flow
@@ -62,6 +62,13 @@ function encodeI64(value: number): number[] {
   return encodeI32(value);
 }
 
+/** Encode an IEEE 754 double (f64) as 8 little-endian bytes. */
+function encodeF64(value: number): number[] {
+  const buf = new ArrayBuffer(8);
+  new Float64Array(buf)[0] = value;
+  return [...new Uint8Array(buf)];
+}
+
 /** Encode a UTF-8 string with length prefix. */
 function encodeString(str: string): number[] {
   const bytes = new TextEncoder().encode(str);
@@ -82,6 +89,7 @@ function section(id: number, contents: number[]): number[] {
 
 const WASM_I32 = 0x7f;
 const WASM_I64 = 0x7e;
+const WASM_F64 = 0x7c;
 const WASM_FUNCREF = 0x60;
 
 // WASM opcodes
@@ -138,6 +146,25 @@ const OP = {
   i32_xor: 0x73,
   i64_extend_i32_s: 0xac,
   i32_wrap_i64: 0xa7,
+  // f64 opcodes
+  f64_const: 0x44,
+  f64_add: 0xa0,
+  f64_sub: 0xa1,
+  f64_mul: 0xa2,
+  f64_div: 0xa3,
+  f64_eq: 0x61,
+  f64_ne: 0x62,
+  f64_lt: 0x63,
+  f64_gt: 0x64,
+  f64_le: 0x65,
+  f64_ge: 0x66,
+  f64_neg: 0x9a,
+  f64_sqrt: 0x9f,
+  f64_floor: 0x8c,
+  f64_ceil: 0x8d,
+  f64_abs: 0x99,
+  i64_trunc_f64_s: 0xb0,
+  f64_convert_i64_s: 0xb9,
 } as const;
 
 // WASM section IDs
@@ -154,9 +181,17 @@ const SECTION = {
 
 // ─── Generator ────────────────────────────────────────────────────
 
+/** Resolve a C! type name to a WASM value type. */
+function resolveWasmType(typeExpr: import('../ast/index.js').TypeExpr | null | undefined): number {
+  if (typeExpr && typeExpr.kind === 'NamedType' && (typeExpr.name === 'f64' || typeExpr.name === 'float')) {
+    return WASM_F64;
+  }
+  return WASM_I64;
+}
+
 interface WasmLocal {
   name: string;
-  type: number; // WASM_I32 or WASM_I64
+  type: number; // WASM_I32, WASM_I64, or WASM_F64
   index: number;
 }
 
@@ -230,9 +265,9 @@ export class WasmGenerator {
   // ─── Function registration ──────────────────────────────────────
 
   private registerFunction(decl: FunctionDecl): void {
-    const paramTypes = decl.params.map(() => WASM_I64); // All params as i64 for now
+    const paramTypes = decl.params.map(p => resolveWasmType(p.typeAnnotation));
     const hasReturn = decl.returnType !== null;
-    const returnTypes = hasReturn ? [WASM_I64] : [];
+    const returnTypes = hasReturn ? [resolveWasmType(decl.returnType)] : [];
     const typeIndex = this.getOrCreateType(paramTypes, returnTypes);
 
     const funcIndex = this.importCount + this.functions.length;
@@ -258,7 +293,7 @@ export class WasmGenerator {
 
     // Register parameters as locals
     for (const param of decl.params) {
-      this.addLocal(param.name, WASM_I64);
+      this.addLocal(param.name, resolveWasmType(param.typeAnnotation));
     }
 
     this.emitBlock(decl.body);
@@ -312,14 +347,16 @@ export class WasmGenerator {
   }
 
   private emitLetStmt(stmt: import('../ast/index.js').LetStmt): void {
-    const localIdx = this.addLocal(stmt.name, WASM_I64);
+    const wasmType = resolveWasmType(stmt.typeAnnotation);
+    const localIdx = this.addLocal(stmt.name, wasmType);
     this.emitExpr(stmt.initializer);
     this.currentBody.push(OP.local_set, ...encodeU32(localIdx));
   }
 
   private emitIfStmt(stmt: import('../ast/index.js').IfStmt): void {
     this.emitExpr(stmt.condition);
-    // Wrap bool to i32 for WASM if (condition might be i64)
+    // f64 comparisons produce i32 directly (via extendBoolToI64 they become i64)
+    // All conditions are i64 booleans — wrap to i32 for WASM if
     this.currentBody.push(OP.i32_wrap_i64);
     this.currentBody.push(OP.if, 0x40); // void block type
     this.emitBlock(stmt.then);
@@ -380,8 +417,7 @@ export class WasmGenerator {
         this.currentBody.push(OP.i64_const, ...encodeI64(parseInt(expr.value, 10)));
         break;
       case 'FloatLiteral':
-        // Approximate as i64 for now
-        this.currentBody.push(OP.i64_const, ...encodeI64(Math.round(parseFloat(expr.value))));
+        this.currentBody.push(OP.f64_const, ...encodeF64(parseFloat(expr.value)));
         break;
       case 'BoolLiteral':
         this.currentBody.push(OP.i64_const, ...encodeI64(expr.value ? 1 : 0));
@@ -428,45 +464,71 @@ export class WasmGenerator {
   }
 
   private emitBinary(expr: import('../ast/index.js').BinaryExpr): void {
-    this.emitExpr(expr.left);
-    this.emitExpr(expr.right);
+    const leftType = this.inferExprType(expr.left);
+    const rightType = this.inferExprType(expr.right);
+    const useF64 = leftType === WASM_F64 || rightType === WASM_F64;
 
-    switch (expr.operator) {
-      case '+':  this.currentBody.push(OP.i64_add); break;
-      case '-':  this.currentBody.push(OP.i64_sub); break;
-      case '*':  this.currentBody.push(OP.i64_mul); break;
-      case '/':  this.currentBody.push(OP.i64_div_s); break;
-      case '%':  this.currentBody.push(OP.i64_rem_s); break;
-      case '==': this.currentBody.push(OP.i64_eq); this.extendBoolToI64(); break;
-      case '!=': this.currentBody.push(OP.i64_ne); this.extendBoolToI64(); break;
-      case '<':  this.currentBody.push(OP.i64_lt_s); this.extendBoolToI64(); break;
-      case '>':  this.currentBody.push(OP.i64_gt_s); this.extendBoolToI64(); break;
-      case '<=': this.currentBody.push(OP.i64_le_s); this.extendBoolToI64(); break;
-      case '>=': this.currentBody.push(OP.i64_ge_s); this.extendBoolToI64(); break;
-      case '&&':
-        // Both are i64 booleans: convert to i32, AND, extend back
-        this.currentBody.push(OP.i32_wrap_i64);
-        // Swap — need both as i32. Simpler: treat as multiply (both are 0 or 1)
-        // Actually let's just use the fact that both are 0/1 i64 values
-        // Pop both, we already pushed them. Use a simpler approach:
-        // a && b = if a then b else 0
-        // But we already pushed both values. Let's use i64_mul which gives 0 if either is 0
-        break; // fallback: already pushed both, the i32_wrap handles it
-      case '||':
-        // a || b: if either is non-zero, result is 1
-        this.currentBody.push(OP.i64_add); // sum > 0 means at least one true
-        break;
-      default:
-        // Unknown operator
-        break;
+    this.emitExpr(expr.left);
+    // If mixed types, convert i64 operand to f64
+    if (useF64 && leftType !== WASM_F64) {
+      this.currentBody.push(OP.f64_convert_i64_s);
+    }
+    this.emitExpr(expr.right);
+    if (useF64 && rightType !== WASM_F64) {
+      this.currentBody.push(OP.f64_convert_i64_s);
+    }
+
+    if (useF64) {
+      switch (expr.operator) {
+        case '+':  this.currentBody.push(OP.f64_add); break;
+        case '-':  this.currentBody.push(OP.f64_sub); break;
+        case '*':  this.currentBody.push(OP.f64_mul); break;
+        case '/':  this.currentBody.push(OP.f64_div); break;
+        // f64 comparisons produce i32 — extend to i64 for our bool representation
+        case '==': this.currentBody.push(OP.f64_eq); this.extendBoolToI64(); break;
+        case '!=': this.currentBody.push(OP.f64_ne); this.extendBoolToI64(); break;
+        case '<':  this.currentBody.push(OP.f64_lt); this.extendBoolToI64(); break;
+        case '>':  this.currentBody.push(OP.f64_gt); this.extendBoolToI64(); break;
+        case '<=': this.currentBody.push(OP.f64_le); this.extendBoolToI64(); break;
+        case '>=': this.currentBody.push(OP.f64_ge); this.extendBoolToI64(); break;
+        default: break;
+      }
+    } else {
+      switch (expr.operator) {
+        case '+':  this.currentBody.push(OP.i64_add); break;
+        case '-':  this.currentBody.push(OP.i64_sub); break;
+        case '*':  this.currentBody.push(OP.i64_mul); break;
+        case '/':  this.currentBody.push(OP.i64_div_s); break;
+        case '%':  this.currentBody.push(OP.i64_rem_s); break;
+        case '==': this.currentBody.push(OP.i64_eq); this.extendBoolToI64(); break;
+        case '!=': this.currentBody.push(OP.i64_ne); this.extendBoolToI64(); break;
+        case '<':  this.currentBody.push(OP.i64_lt_s); this.extendBoolToI64(); break;
+        case '>':  this.currentBody.push(OP.i64_gt_s); this.extendBoolToI64(); break;
+        case '<=': this.currentBody.push(OP.i64_le_s); this.extendBoolToI64(); break;
+        case '>=': this.currentBody.push(OP.i64_ge_s); this.extendBoolToI64(); break;
+        case '&&':
+          this.currentBody.push(OP.i32_wrap_i64);
+          break;
+        case '||':
+          this.currentBody.push(OP.i64_add);
+          break;
+        default:
+          break;
+      }
     }
   }
 
   private emitUnary(expr: import('../ast/index.js').UnaryExpr): void {
     if (expr.operator === '-') {
-      this.currentBody.push(OP.i64_const, ...encodeI64(0));
-      this.emitExpr(expr.operand);
-      this.currentBody.push(OP.i64_sub);
+      const operandType = this.inferExprType(expr.operand);
+      if (operandType === WASM_F64) {
+        this.emitExpr(expr.operand);
+        this.currentBody.push(OP.f64_neg);
+      } else {
+        this.currentBody.push(OP.i64_const, ...encodeI64(0));
+        this.emitExpr(expr.operand);
+        this.currentBody.push(OP.i64_sub);
+      }
     } else if (expr.operator === '!') {
       this.emitExpr(expr.operand);
       this.currentBody.push(OP.i64_eqz);
@@ -573,6 +635,71 @@ export class WasmGenerator {
   /** Extend i32 boolean (0/1) result to i64. */
   private extendBoolToI64(): void {
     this.currentBody.push(OP.i64_extend_i32_s);
+  }
+
+  /** Infer the WASM value type of an expression. */
+  private inferExprType(expr: Expr): number {
+    switch (expr.kind) {
+      case 'FloatLiteral':
+        return WASM_F64;
+      case 'Ident': {
+        const idx = this.localMap.get(expr.name);
+        if (idx !== undefined) {
+          const local = this.locals.find(l => l.index === idx);
+          if (local) return local.type;
+        }
+        return WASM_I64;
+      }
+      case 'Binary': {
+        const leftType = this.inferExprType(expr.left);
+        const rightType = this.inferExprType(expr.right);
+        // Comparisons always produce i64 (our bool representation) or i32 internally
+        const op = expr.operator;
+        if (op === '==' || op === '!=' || op === '<' || op === '>' || op === '<=' || op === '>=' || op === '&&' || op === '||') {
+          return WASM_I64; // boolean result stored as i64
+        }
+        if (leftType === WASM_F64 || rightType === WASM_F64) return WASM_F64;
+        return WASM_I64;
+      }
+      case 'Unary':
+        return this.inferExprType(expr.operand);
+      case 'Call': {
+        if (expr.callee.kind === 'Ident') {
+          const funcIdx = this.funcNames.get(expr.callee.name);
+          if (funcIdx !== undefined && funcIdx >= this.importCount) {
+            const func = this.functions[funcIdx - this.importCount];
+            if (func) {
+              const sig = this.types[func.typeIndex];
+              if (sig) {
+                // Decode return type from the type signature
+                // Format: [WASM_FUNCREF, paramCount, ...params, resultCount, ...results]
+                const paramCount = sig[1]!;
+                const resultCount = sig[2 + paramCount]!;
+                if (resultCount > 0) {
+                  return sig[3 + paramCount]!;
+                }
+              }
+            }
+          }
+        }
+        return WASM_I64;
+      }
+      default:
+        return WASM_I64;
+    }
+  }
+
+  /** Check if an expression is in f64 context (for condition wrapping). */
+  private isF64Condition(expr: Expr): boolean {
+    if (expr.kind === 'Binary') {
+      const op = expr.operator;
+      if (op === '==' || op === '!=' || op === '<' || op === '>' || op === '<=' || op === '>=') {
+        const leftType = this.inferExprType(expr.left);
+        const rightType = this.inferExprType(expr.right);
+        return leftType === WASM_F64 || rightType === WASM_F64;
+      }
+    }
+    return false;
   }
 
   private exprProducesValue(expr: Expr): boolean {

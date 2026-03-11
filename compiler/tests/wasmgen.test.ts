@@ -263,6 +263,69 @@ describe('WasmGenerator', () => {
     });
   });
 
+  // ─── Floating point ────────────────────────────────────────────
+
+  describe('floating point', () => {
+    it('compiles float literals to f64', async () => {
+      const wasm = generateWasm(`
+        fn main() {
+          let x: f64 = 3.14;
+        }
+      `);
+      const module = await WebAssembly.compile(wasm);
+      expect(module).toBeDefined();
+    });
+
+    it('performs f64 arithmetic', async () => {
+      const wasm = generateWasm(`
+        fn add_floats(a: f64, b: f64) -> f64 {
+          return a + b;
+        }
+        fn main() {
+          let result: f64 = add_floats(1.5, 2.5);
+        }
+      `);
+      const module = await WebAssembly.compile(wasm);
+      expect(module).toBeDefined();
+    });
+
+    it('handles float comparisons', async () => {
+      const wasm = generateWasm(`
+        fn main() {
+          let x: f64 = 3.14;
+          if x > 3.0 {
+            println("big");
+          }
+        }
+      `);
+      const output = await runWasm(wasm);
+      expect(output).toBe('big\n');
+    });
+
+    it('compiles f64 subtraction and multiplication', async () => {
+      const wasm = generateWasm(`
+        fn main() {
+          let a: f64 = 10.0;
+          let b: f64 = a - 3.5;
+          let c: f64 = a * 2.0;
+        }
+      `);
+      const module = await WebAssembly.compile(wasm);
+      expect(module).toBeDefined();
+    });
+
+    it('compiles f64 division', async () => {
+      const wasm = generateWasm(`
+        fn main() {
+          let a: f64 = 10.0;
+          let b: f64 = a / 3.0;
+        }
+      `);
+      const module = await WebAssembly.compile(wasm);
+      expect(module).toBeDefined();
+    });
+  });
+
   // ─── Edge cases ─────────────────────────────────────────────────
 
   describe('edge cases', () => {
