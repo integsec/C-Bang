@@ -110,4 +110,63 @@ describe('EvmGenerator', () => {
     `);
     expect(result.bytecode).toContain('01'); // ADD
   });
+
+  it('generates JUMPI for conditionals', () => {
+    const result = generateEvm(`
+      contract Guard {
+        state locked: bool = false;
+        pub fn check() -> u256 {
+          if locked {
+            return 0;
+          }
+          return 1;
+        }
+      }
+    `);
+    expect(result.bytecode).toContain('57'); // JUMPI
+    expect(result.bytecode).toContain('5b'); // JUMPDEST
+  });
+
+  it('generates LOG for events', () => {
+    const result = generateEvm(`
+      contract Token {
+        state supply: u256 = 0;
+        pub fn mint(amount: u256) {
+          supply = supply + amount;
+          emit Transfer(amount);
+        }
+      }
+    `);
+    // Should have LOG opcode
+    expect(result.bytecode).toContain('a1'); // LOG1
+  });
+
+  it('generates while loop opcodes', () => {
+    const result = generateEvm(`
+      contract Counter {
+        state count: u256 = 0;
+        pub fn loop_test() {
+          while count > 0 {
+            count = count - 1;
+          }
+        }
+      }
+    `);
+    expect(result.bytecode).toContain('5b'); // JUMPDEST (loop top)
+    expect(result.bytecode).toContain('56'); // JUMP (back to top)
+    expect(result.bytecode).toContain('57'); // JUMPI (exit condition)
+  });
+
+  it('generates subtraction and multiplication', () => {
+    const result = generateEvm(`
+      contract Math {
+        state value: u256 = 0;
+        pub fn compute(a: u256, b: u256) -> u256 {
+          return a * b - a;
+        }
+      }
+    `);
+    expect(result.bytecode).toContain('02'); // MUL
+    expect(result.bytecode).toContain('03'); // SUB
+  });
 });
