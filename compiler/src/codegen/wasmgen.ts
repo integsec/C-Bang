@@ -267,6 +267,7 @@ export class WasmGenerator {
     this.enumVariants.clear();
     this.closureCounter = 0;
     this.deferredClosures = [];
+    this.usesArrays = false;
     this.heapBase = 0;
 
     // Register WASI fd_write import: (i32, i32, i32, i32) -> i32
@@ -411,8 +412,7 @@ export class WasmGenerator {
         this.emitWhileStmt(stmt as any);
         break;
       case 'ForStmt':
-        // For loops: simplified — emit iterable and body
-        this.emitBlock(stmt.body);
+        this.emitForStmt(stmt);
         break;
       case 'AssignStmt':
         this.emitAssignStmt(stmt);
@@ -470,6 +470,61 @@ export class WasmGenerator {
     this.currentBody.push(OP.br, ...encodeU32(0)); // continue loop
     this.currentBody.push(OP.end); // end loop
     this.currentBody.push(OP.end); // end block
+  }
+
+  private emitForStmt(stmt: import('../ast/index.js').ForStmt): void {
+    // Check if iterable is a range() call
+    const iterable = stmt.iterable;
+    if (iterable.kind === 'Call' && iterable.callee.kind === 'Ident' && iterable.callee.name === 'range') {
+      // range(start, end) — emit as: let i = start; while (i < end) { body; i = i + 1; }
+      const startExpr = iterable.args[0]?.value;
+      const endExpr = iterable.args[1]?.value;
+
+      if (!startExpr || !endExpr) {
+        // Malformed range — just emit body
+        this.emitBlock(stmt.body);
+        return;
+      }
+
+      // Create loop variable
+      const loopVarIdx = this.addLocal(stmt.variable, WASM_I64);
+
+      // Initialize: i = start
+      this.emitExpr(startExpr);
+      this.currentBody.push(OP.local_set, ...encodeU32(loopVarIdx));
+
+      // Store end value in a temp
+      const endIdx = this.addLocal('__for_end', WASM_I64);
+      this.emitExpr(endExpr);
+      this.currentBody.push(OP.local_set, ...encodeU32(endIdx));
+
+      // while (i < end)
+      this.currentBody.push(OP.block, 0x40); // outer block
+      this.currentBody.push(OP.loop, 0x40);  // inner loop
+
+      // condition: i < end
+      this.currentBody.push(OP.local_get, ...encodeU32(loopVarIdx));
+      this.currentBody.push(OP.local_get, ...encodeU32(endIdx));
+      this.currentBody.push(OP.i64_lt_s);
+      this.currentBody.push(OP.i32_eqz);
+      this.currentBody.push(OP.br_if, ...encodeU32(1)); // break if false
+
+      // body
+      this.emitBlock(stmt.body);
+
+      // increment: i = i + 1
+      this.currentBody.push(OP.local_get, ...encodeU32(loopVarIdx));
+      this.currentBody.push(OP.i64_const, ...encodeI64(1));
+      this.currentBody.push(OP.i64_add);
+      this.currentBody.push(OP.local_set, ...encodeU32(loopVarIdx));
+
+      this.currentBody.push(OP.br, ...encodeU32(0)); // continue loop
+      this.currentBody.push(OP.end); // end loop
+      this.currentBody.push(OP.end); // end block
+    } else {
+      // Non-range for loops — just emit body as fallback
+      this.emitBlock(stmt.body);
+    }
   }
 
   private emitAssignStmt(stmt: import('../ast/index.js').AssignStmt): void {
@@ -672,6 +727,12 @@ export class WasmGenerator {
         break;
       case 'Closure':
         this.emitClosure(expr as ClosureExpr);
+        break;
+      case 'ArrayLiteral':
+        this.emitArrayLiteral(expr);
+        break;
+      case 'Index':
+        this.emitIndex(expr);
         break;
       default:
         // Unsupported expression — emit 0
@@ -971,6 +1032,58 @@ export class WasmGenerator {
     this.currentBody.push(OP.drop);                         // drop errno result
   }
 
+  // ─── Array emission ────────────────────────────────────────────
+
+  private emitArrayLiteral(expr: import('../ast/index.js').ArrayLiteralExpr): void {
+    this.usesArrays = true;
+    const elemCount = expr.elements.length;
+    const totalSize = 8 + elemCount * 8; // 8 bytes for length + 8 bytes per element
+
+    // Bump allocate
+    this.currentBody.push(OP.global_get, ...encodeU32(0)); // heap pointer
+    const tmpIdx = this.addLocal('__arr_ptr', WASM_I32);
+    this.currentBody.push(OP.local_tee, ...encodeU32(tmpIdx));
+    this.currentBody.push(OP.i32_const, ...encodeI32(totalSize));
+    this.currentBody.push(OP.i32_add);
+    this.currentBody.push(OP.global_set, ...encodeU32(0)); // update heap pointer
+
+    // Store length at offset 0
+    this.currentBody.push(OP.local_get, ...encodeU32(tmpIdx));
+    this.currentBody.push(OP.i64_const, ...encodeI64(elemCount));
+    this.currentBody.push(OP.i64_store, 0x03, ...encodeU32(0));
+
+    // Store each element at offset 8 + i * 8
+    for (let i = 0; i < elemCount; i++) {
+      this.currentBody.push(OP.local_get, ...encodeU32(tmpIdx));
+      this.emitExpr(expr.elements[i]!);
+      this.currentBody.push(OP.i64_store, 0x03, ...encodeU32(8 + i * 8));
+    }
+
+    // Return pointer as i64
+    this.currentBody.push(OP.local_get, ...encodeU32(tmpIdx));
+    this.currentBody.push(OP.i64_extend_i32_s);
+  }
+
+  private emitIndex(expr: import('../ast/index.js').IndexExpr): void {
+    // Load from base + 8 + index * 8 (skip the length prefix)
+    this.emitExpr(expr.object);
+    this.currentBody.push(OP.i32_wrap_i64); // pointer as i32
+
+    // Calculate byte offset: 8 + index * 8
+    this.emitExpr(expr.index);
+    this.currentBody.push(OP.i32_wrap_i64);
+    this.currentBody.push(OP.i32_const, ...encodeI32(8));
+    this.currentBody.push(OP.i32_mul);
+    this.currentBody.push(OP.i32_const, ...encodeI32(8));
+    this.currentBody.push(OP.i32_add);
+
+    // Add base pointer + offset
+    this.currentBody.push(OP.i32_add);
+
+    // Load i64 value
+    this.currentBody.push(OP.i64_load, 0x03, ...encodeU32(0));
+  }
+
   // ─── Closure emission ──────────────────────────────────────────
 
   private emitClosure(expr: ClosureExpr): void {
@@ -1159,6 +1272,9 @@ export class WasmGenerator {
     return false;
   }
 
+  // Track whether arrays are used (for heap allocation)
+  private usesArrays = false;
+
   private addLocal(name: string, type: number): number {
     const index = this.nextLocalIndex++;
     this.locals.push({ name, type, index });
@@ -1239,8 +1355,8 @@ export class WasmGenerator {
       ...encodeU32(pages),
     ]));
 
-    // Global section: heap pointer (mutable i32) — needed for structs and tuple enum variants
-    const needsHeap = this.structLayouts.size > 0 || this.hasHeapEnumVariants();
+    // Global section: heap pointer (mutable i32) — needed for structs, tuple enum variants, and arrays
+    const needsHeap = this.structLayouts.size > 0 || this.hasHeapEnumVariants() || this.usesArrays;
     if (needsHeap) {
       const globals = [
         [

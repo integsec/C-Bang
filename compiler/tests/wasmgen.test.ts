@@ -473,6 +473,33 @@ describe('WasmGenerator', () => {
     });
   });
 
+  // ─── Arrays and for loops ───────────────────────────────────────
+
+  describe('arrays and for loops', () => {
+    it('compiles array literal', async () => {
+      const wasm = generateWasm(`
+        fn main() {
+          let arr = [1, 2, 3];
+        }
+      `);
+      const module = await WebAssembly.compile(wasm);
+      expect(module).toBeDefined();
+    });
+
+    it('compiles for loop with range', async () => {
+      const wasm = generateWasm(`
+        fn main() {
+          let mut sum: i64 = 0;
+          for i in range(1, 4) {
+            sum = sum + i;
+          }
+        }
+      `);
+      const module = await WebAssembly.compile(wasm);
+      expect(module).toBeDefined();
+    });
+  });
+
   // ─── Closures ──────────────────────────────────────────────────
 
   describe('closures', () => {
