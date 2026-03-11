@@ -25,6 +25,7 @@ import type {
   Stmt,
   Expr,
   ClosureExpr,
+  ActorDecl,
 } from '../ast/index.js';
 
 // ─── WASM binary encoding helpers ─────────────────────────────────
@@ -275,12 +276,14 @@ export class WasmGenerator {
     this.importCount = 1;
     this.funcNames.set('__fd_write', 0);
 
-    // First pass — register type declarations (structs and enums)
+    // First pass — register type declarations (structs, enums, actors)
     for (const item of program.items) {
       if (item.kind === 'TypeDecl') {
         this.registerTypeDecl(item);
       } else if (item.kind === 'EnumDecl') {
         this.registerEnumDecl(item);
+      } else if (item.kind === 'ActorDecl') {
+        this.registerActorDecl(item);
       }
     }
 
@@ -288,6 +291,8 @@ export class WasmGenerator {
     for (const item of program.items) {
       if (item.kind === 'FunctionDecl') {
         this.registerFunction(item);
+      } else if (item.kind === 'ActorDecl') {
+        this.registerActorFunctions(item);
       }
     }
 
@@ -295,6 +300,8 @@ export class WasmGenerator {
     for (const item of program.items) {
       if (item.kind === 'FunctionDecl') {
         this.generateFunction(item);
+      } else if (item.kind === 'ActorDecl') {
+        this.generateActorFunctions(item);
       }
     }
 
@@ -352,6 +359,154 @@ export class WasmGenerator {
         fieldCount,
       });
       tag++;
+    }
+  }
+
+  private registerActorDecl(decl: ActorDecl): void {
+    // Register actor state as a struct layout
+    const fields: { name: string; offset: number; type: number }[] = [];
+    let offset = 0;
+    for (const member of decl.members) {
+      if (member.kind === 'StateDecl') {
+        fields.push({
+          name: member.name,
+          offset,
+          type: resolveWasmType(member.typeAnnotation),
+        });
+        offset += 8; // Each field is 8 bytes (i64-sized)
+      }
+    }
+    this.structLayouts.set(decl.name, { fields, size: offset || 8 }); // min 8 bytes
+  }
+
+  private registerActorFunctions(decl: ActorDecl): void {
+    // Register each on handler and method as a function
+    // Each takes an implicit first parameter: the actor struct pointer (i64)
+    for (const member of decl.members) {
+      if (member.kind === 'OnHandler') {
+        const funcName = `${decl.name}__on_${member.messageName}`;
+        const paramTypes = [WASM_I64, ...member.params.map(p => resolveWasmType(p.typeAnnotation))];
+        const returnTypes = member.returnType ? [resolveWasmType(member.returnType)] : [];
+        const typeIndex = this.getOrCreateType(paramTypes, returnTypes);
+
+        const funcIndex = this.importCount + this.functions.length;
+        this.funcNames.set(funcName, funcIndex);
+
+        this.functions.push({
+          name: funcName,
+          typeIndex,
+          localTypes: [],
+          body: [],
+          exported: false,
+        });
+      } else if (member.kind === 'FunctionDecl') {
+        const funcName = `${decl.name}__${member.name}`;
+        const paramTypes = [WASM_I64, ...member.params.map(p => resolveWasmType(p.typeAnnotation))];
+        const hasReturn = member.returnType !== null;
+        const returnTypes = hasReturn ? [resolveWasmType(member.returnType)] : [];
+        const typeIndex = this.getOrCreateType(paramTypes, returnTypes);
+
+        const funcIndex = this.importCount + this.functions.length;
+        this.funcNames.set(funcName, funcIndex);
+
+        this.functions.push({
+          name: funcName,
+          typeIndex,
+          localTypes: [],
+          body: [],
+          exported: false,
+        });
+      }
+    }
+  }
+
+  private generateActorFunctions(decl: ActorDecl): void {
+    for (const member of decl.members) {
+      if (member.kind === 'OnHandler') {
+        const funcName = `${decl.name}__on_${member.messageName}`;
+        const funcIndex = this.funcNames.get(funcName)!;
+        const func = this.functions[funcIndex - this.importCount]!;
+
+        this.locals = [];
+        this.localMap.clear();
+        this.localStructTypes.clear();
+        this.currentBody = [];
+        this.nextLocalIndex = 0;
+
+        // Implicit self parameter (actor struct pointer)
+        const selfIdx = this.addLocal('__self', WASM_I64);
+        this.localStructTypes.set('__self', decl.name);
+
+        // Register handler parameters
+        for (const param of member.params) {
+          this.addLocal(param.name, resolveWasmType(param.typeAnnotation));
+        }
+
+        // Register state field names as locals that load from the struct
+        // For simplicity in MVP, bind state fields as locals initialized from struct
+        for (const stateM of decl.members) {
+          if (stateM.kind === 'StateDecl') {
+            const layout = this.structLayouts.get(decl.name)!;
+            const fieldLayout = layout.fields.find(f => f.name === stateM.name);
+            if (fieldLayout) {
+              const stateLocalIdx = this.addLocal(stateM.name, WASM_I64);
+              // Load field value from self pointer
+              this.currentBody.push(OP.local_get, ...encodeU32(selfIdx));
+              this.currentBody.push(OP.i32_wrap_i64);
+              this.currentBody.push(OP.i64_load, 0x03, ...encodeU32(fieldLayout.offset));
+              this.currentBody.push(OP.local_set, ...encodeU32(stateLocalIdx));
+            }
+          }
+        }
+
+        this.emitBlock(member.body);
+
+        // Write back state fields to struct
+        for (const stateM of decl.members) {
+          if (stateM.kind === 'StateDecl') {
+            const layout = this.structLayouts.get(decl.name)!;
+            const fieldLayout = layout.fields.find(f => f.name === stateM.name);
+            const stateLocalIdx = this.localMap.get(stateM.name);
+            if (fieldLayout && stateLocalIdx !== undefined) {
+              this.currentBody.push(OP.local_get, ...encodeU32(selfIdx));
+              this.currentBody.push(OP.i32_wrap_i64);
+              this.currentBody.push(OP.local_get, ...encodeU32(stateLocalIdx));
+              this.currentBody.push(OP.i64_store, 0x03, ...encodeU32(fieldLayout.offset));
+            }
+          }
+        }
+
+        func.localTypes = this.locals.slice(1 + member.params.length).map(l => l.type);
+        func.body = [...this.currentBody, OP.end];
+
+        this.compileDeferredClosures();
+      } else if (member.kind === 'FunctionDecl') {
+        const funcName = `${decl.name}__${member.name}`;
+        const funcIndex = this.funcNames.get(funcName)!;
+        const func = this.functions[funcIndex - this.importCount]!;
+
+        this.locals = [];
+        this.localMap.clear();
+        this.localStructTypes.clear();
+        this.currentBody = [];
+        this.nextLocalIndex = 0;
+
+        // Implicit self parameter
+        const selfIdx = this.addLocal('__self', WASM_I64);
+        this.localStructTypes.set('__self', decl.name);
+
+        // Register method parameters
+        for (const param of member.params) {
+          this.addLocal(param.name, resolveWasmType(param.typeAnnotation));
+        }
+
+        this.emitBlock(member.body);
+
+        func.localTypes = this.locals.slice(1 + member.params.length).map(l => l.type);
+        func.body = [...this.currentBody, OP.end];
+
+        this.compileDeferredClosures();
+      }
     }
   }
 

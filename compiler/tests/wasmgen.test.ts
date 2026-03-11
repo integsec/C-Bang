@@ -514,6 +514,25 @@ describe('WasmGenerator', () => {
     });
   });
 
+  // ─── Actors ────────────────────────────────────────────────────
+
+  describe('actors', () => {
+    it('compiles actor declaration', async () => {
+      const wasm = generateWasm(`
+        actor Counter {
+          state count: i64 = 0;
+
+          on Increment() {
+            count = count + 1;
+          }
+        }
+        fn main() {}
+      `);
+      const module = await WebAssembly.compile(wasm);
+      expect(module).toBeDefined();
+    });
+  });
+
   // ─── Edge cases ─────────────────────────────────────────────────
 
   describe('edge cases', () => {
