@@ -276,7 +276,11 @@ export class EffectChecker {
         break;
       case 'Closure':
         // Closures inherit the effect context — check the body
-        this.checkBlock(expr.body, ctx);
+        if (expr.body.kind === 'Block') {
+          this.checkBlock(expr.body, ctx);
+        } else {
+          this.checkExpr(expr.body, ctx);
+        }
         break;
       default:
         break;
@@ -362,7 +366,7 @@ export class EffectChecker {
   }
 
   private warning(message: string, span: Span, suggestion?: string): void {
-    this.diagnostics.push(createWarning('W_EFFECT', message, span, { suggestion }));
+    this.diagnostics.push(createWarning('W_EFFECT', message, span, suggestion ? { suggestion } : {}));
   }
 }
 

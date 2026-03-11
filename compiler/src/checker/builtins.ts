@@ -4,7 +4,6 @@
 
 import type { Environment } from './environment.js';
 import { PRIMITIVES } from './types.js';
-import type { Type } from './types.js';
 
 export function registerBuiltins(env: Environment): void {
   for (const name of PRIMITIVES) {

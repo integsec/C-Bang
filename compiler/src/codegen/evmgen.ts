@@ -11,7 +11,6 @@
 import type {
   Program,
   ContractDecl,
-  ContractMember,
   FunctionDecl,
   StateDecl,
   Block,
@@ -59,7 +58,6 @@ export class EvmGenerator {
   private nextSlot = 0;
   private functionSelectors: Map<string, string> = new Map();
   private currentParams: Map<string, number> = new Map();
-  private labelCounter = 0;
 
   generate(program: Program): { bytecode: string; abi: any[] } {
     // Find contract declarations
@@ -279,8 +277,7 @@ export class EvmGenerator {
 
       // PUSH2 <offset> — placeholder, we'll resolve later
       this.emit(EVM.PUSH2);
-      // For now, emit a placeholder jump target
-      const jumpTarget = this.bytecode.length;
+      // Placeholder jump target (bytecode.length used for patching later)
       this.emit('00');
       this.emit('00');
 
@@ -384,7 +381,6 @@ export class EvmGenerator {
 
     // PUSH2 <else-offset>
     this.emit(EVM.PUSH2);
-    const elsePlaceholder = this.bytecode.length;
     this.emit('00');
     this.emit('00');
 

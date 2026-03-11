@@ -16,7 +16,6 @@
 
 import type {
   Program,
-  TopLevelItem,
   TypeDecl,
   FunctionDecl,
   Block,
@@ -29,7 +28,7 @@ import type {
 import type { Span } from '../lexer/index.js';
 import type { Diagnostic } from '../errors/index.js';
 import { createError, createWarning } from '../errors/index.js';
-import { NUMERIC_TYPES, INTEGER_TYPES, PRIMITIVES } from './types.js';
+import { NUMERIC_TYPES } from './types.js';
 
 // ─── Refined type info ────────────────────────────────────────────
 

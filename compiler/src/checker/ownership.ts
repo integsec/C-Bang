@@ -19,7 +19,6 @@ import type {
   Block,
   Stmt,
   Expr,
-  Parameter,
 } from '../ast/index.js';
 import type { Span } from '../lexer/index.js';
 import type { Diagnostic } from '../errors/index.js';

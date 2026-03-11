@@ -668,6 +668,8 @@ export class Checker {
       case 'SharedType':
         // Strip shared wrapper
         return this.resolveTypeExpr(texpr.inner);
+      default:
+        return { kind: 'Unknown' };
     }
   }
 

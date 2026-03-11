@@ -18,7 +18,6 @@
 
 import type {
   Program,
-  TopLevelItem,
   FunctionDecl,
   TypeDecl,
   Block,
@@ -324,7 +323,7 @@ export class WasmGenerator {
       typeIndex,
       localTypes: [],
       body: [],
-      exported: decl.name === 'main' || decl.public,
+      exported: decl.name === 'main' || decl.visibility === 'public',
     });
   }
 
@@ -492,7 +491,7 @@ export class WasmGenerator {
         this.nextLocalIndex = 0;
 
         // Implicit self parameter
-        const selfIdx = this.addLocal('__self', WASM_I64);
+        this.addLocal('__self', WASM_I64);
         this.localStructTypes.set('__self', decl.name);
 
         // Register method parameters
@@ -696,7 +695,6 @@ export class WasmGenerator {
         switch (stmt.operator) {
           case '+=': this.currentBody.push(OP.i64_add); break;
           case '-=': this.currentBody.push(OP.i64_sub); break;
-          case '*=': this.currentBody.push(OP.i64_mul); break;
           default: this.emitExpr(stmt.value); break;
         }
       }
@@ -1377,19 +1375,6 @@ export class WasmGenerator {
       default:
         return WASM_I64;
     }
-  }
-
-  /** Check if an expression is in f64 context (for condition wrapping). */
-  private isF64Condition(expr: Expr): boolean {
-    if (expr.kind === 'Binary') {
-      const op = expr.operator;
-      if (op === '==' || op === '!=' || op === '<' || op === '>' || op === '<=' || op === '>=') {
-        const leftType = this.inferExprType(expr.left);
-        const rightType = this.inferExprType(expr.right);
-        return leftType === WASM_F64 || rightType === WASM_F64;
-      }
-    }
-    return false;
   }
 
   private exprProducesValue(expr: Expr): boolean {

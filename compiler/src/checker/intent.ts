@@ -26,7 +26,6 @@ import type {
   ServerDecl,
   ComponentDecl,
   EnumDecl,
-  Parameter,
 } from '../ast/index.js';
 import type { Span } from '../lexer/index.js';
 import type { Diagnostic } from '../errors/index.js';
@@ -438,7 +437,7 @@ export class IntentChecker {
   }
 
   private warning(message: string, span: Span, suggestion?: string): void {
-    this.diagnostics.push(createWarning('W_INTENT', message, span, { suggestion }));
+    this.diagnostics.push(createWarning('W_INTENT', message, span, suggestion ? { suggestion } : {}));
   }
 }
 

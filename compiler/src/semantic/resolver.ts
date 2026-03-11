@@ -32,12 +32,11 @@ import type {
   TypeExpr,
   MatchArm,
   Pattern,
-  Parameter,
 } from '../ast/index.js';
 import type { Span } from '../lexer/index.js';
 import type { Diagnostic } from '../errors/index.js';
-import { createError, createWarning } from '../errors/index.js';
-import type { SymbolInfo, SymbolKind } from './scope.js';
+import { createError } from '../errors/index.js';
+import type { SymbolKind } from './scope.js';
 import { SymbolTable } from './scope.js';
 
 // ─── Builtin names ────────────────────────────────────────────────
@@ -185,7 +184,7 @@ export class Resolver {
       symbolKind,
       span: decl.span,
       mutable: false,
-      fields: fields.length > 0 ? fields : undefined,
+      ...(fields.length > 0 ? { fields } : {}),
     });
     if (!ok) {
       this.error(
@@ -938,7 +937,7 @@ export class Resolver {
     // If the object is a simple identifier that resolves to a known struct type,
     // we can check field validity.
     if (expr.object.kind === 'Ident') {
-      const valInfo = this.symbols.lookupValue(expr.object.name);
+      this.symbols.lookupValue(expr.object.name);
       // We don't error on unknown fields at the semantic level because
       // the type checker handles that more precisely with type info.
       // The semantic pass just ensures the object itself is resolved.

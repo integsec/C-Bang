@@ -18,7 +18,6 @@ import type {
   Block,
   Stmt,
   Expr,
-  TypeExpr,
 } from '../ast/index.js';
 
 // ─── WASM binary encoding helpers ─────────────────────────────────
@@ -75,7 +74,6 @@ function section(id: number, contents: number[]): number[] {
 
 // ─── WASM constants ───────────────────────────────────────────────
 
-const WASM_I32 = 0x7f;
 const WASM_I64 = 0x7e;
 const WASM_FUNCREF = 0x60;
 
@@ -112,6 +110,7 @@ const OP = {
   i32_ge_s: 0x4e,
   i64_eqz: 0x50,
   i64_eq: 0x51,
+  i64_ne: 0x52,
   i64_add: 0x7c,
   i64_sub: 0x7d,
   i64_mul: 0x7e,
@@ -427,7 +426,6 @@ export class NearGenerator {
   }
 
   private generateFunctionBody(fn: FunctionDecl, importIndex: Map<string, number>): number[] {
-    const locals: number[] = [];
     const body: number[] = [];
 
     // Declare locals: one i64 for each parameter + temp variables

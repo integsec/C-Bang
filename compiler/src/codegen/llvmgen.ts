@@ -16,8 +16,6 @@ import type {
   Stmt,
   Expr,
   Parameter,
-  MatchArm,
-  Pattern,
   StateDecl,
 } from '../ast/index.js';
 
@@ -1038,7 +1036,6 @@ export class LlvmGenerator {
 
   private emitActorDecl(decl: ActorDecl): void {
     // Struct type already registered in pre-pass
-    const stateMembers = decl.members.filter(m => m.kind === 'StateDecl') as StateDecl[];
     const onHandlers = decl.members.filter(m => m.kind === 'OnHandler') as import('../ast/index.js').OnHandler[];
     const functions = decl.members.filter(m => m.kind === 'FunctionDecl') as FunctionDecl[];
 
