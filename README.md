@@ -120,20 +120,52 @@ actor WalletService {
 - **Supervision Trees** — Erlang-style fault tolerance built in
 - **Full-Stack Unified** — Frontend, backend, contracts share one type system
 
+## Compilation Targets
+
+C! compiles to **five targets** from a single codebase — from web apps to smart contracts:
+
+| Target | Command | Output | Use Case |
+|--------|---------|--------|----------|
+| JavaScript | `cbang build hello.cb` | `.js` | Web apps, Node.js |
+| WebAssembly | `cbang build --target wasm hello.cb` | `.wasm` | Near-native performance |
+| LLVM IR | `cbang build --target llvm hello.cb` | `.ll` | Native binaries |
+| EVM | `cbang build --target evm contract.cb` | `.hex` + `.abi.json` | Ethereum smart contracts |
+| NEAR | `cbang build --target near contract.cb` | `.near.wasm` | NEAR Protocol contracts |
+
 ## Project Status
 
-C! is in the **design phase**. We are actively building the language and welcome contributors.
+C! has a **working multi-target compiler** with **639 tests** passing across 11 test suites. The compiler is built in TypeScript (bootstrap phase) and compiles C! to five different targets.
+
+### Compiler Status
+
+| Component | Status | Tests |
+|-----------|--------|-------|
+| Lexer | COMPLETE | 80 |
+| Parser | COMPLETE | 121 |
+| Semantic Analysis | COMPLETE | 57 |
+| Type Checker | COMPLETE | 65 |
+| Effect Checker | COMPLETE | 30 |
+| JS Codegen | COMPLETE | 74 |
+| WASM Codegen | COMPLETE | 62 |
+| LLVM IR Codegen | COMPLETE | 56 |
+| EVM Codegen | COMPLETE | 54 |
+| NEAR Codegen | COMPLETE | 40 |
+
+The compiler source lives in `compiler/src/` with five code generators in `compiler/src/codegen/`: `jsgen.ts`, `wasmgen.ts`, `llvmgen.ts`, `evmgen.ts`, and `neargen.ts`.
 
 ### Roadmap
 
 - [x] Language design document
-- [ ] TypeScript transpiler (bootstrap / playground)
-- [ ] Lexer and parser
-- [ ] Type checker with linear types
+- [x] TypeScript transpiler (bootstrap / playground)
+- [x] Lexer and parser
+- [x] Type checker with linear types
+- [x] Effect system
+- [x] JavaScript code generation
+- [x] WebAssembly code generation
+- [x] LLVM IR code generation
+- [x] EVM smart contract compilation
+- [x] NEAR smart contract compilation
 - [ ] Actor model runtime
-- [ ] WASM code generation
-- [ ] LLVM native code generation
-- [ ] Smart contract compilation
 - [ ] Self-hosted compiler
 - [ ] Package manager
 - [ ] LSP / editor support
