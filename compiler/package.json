@@ -1,6 +1,6 @@
 {
   "name": "cbang",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "The C! (C-Bang) programming language compiler",
   "type": "module",
   "main": "dist/index.js",
